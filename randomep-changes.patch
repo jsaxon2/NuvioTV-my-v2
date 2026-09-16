@@ -1,0 +1,3260 @@
+diff --git a/app/build.gradle.kts b/app/build.gradle.kts
+index bc6948506..00a02487b 100644
+--- a/app/build.gradle.kts
++++ b/app/build.gradle.kts
+@@ -102,6 +102,7 @@ android {
+ 
+     defaultConfig {
+         applicationId = "com.nuvio.tv"
++        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+         minSdk = 24
+         targetSdk = 36
+         versionCode = 1058
+@@ -192,7 +193,7 @@ android {
+     buildTypes {
+         debug {
+             signingConfig = signingConfigs.getByName("release")
+-            isDebuggable = false
++            isDebuggable = parseBooleanProperty(providers.gradleProperty("debuggable").orNull)
+             isMinifyEnabled = false
+ 
+             buildConfigField("boolean", "IS_DEBUG_BUILD", "true")
+diff --git a/app/src/androidTest/java/com/nuvio/tv/ui/screens/detail/EpisodeShuffleTvTest.kt b/app/src/androidTest/java/com/nuvio/tv/ui/screens/detail/EpisodeShuffleTvTest.kt
+new file mode 100644
+index 000000000..c1007dc38
+--- /dev/null
++++ b/app/src/androidTest/java/com/nuvio/tv/ui/screens/detail/EpisodeShuffleTvTest.kt
+@@ -0,0 +1,372 @@
++package com.nuvio.tv.ui.screens.detail
++
++import android.graphics.Bitmap
++import android.os.SystemClock
++import android.view.KeyEvent
++import androidx.compose.foundation.background
++import androidx.compose.foundation.layout.Arrangement
++import androidx.compose.foundation.layout.Box
++import androidx.compose.foundation.layout.Row
++import androidx.compose.foundation.layout.fillMaxSize
++import androidx.compose.foundation.layout.padding
++import androidx.compose.runtime.Composable
++import androidx.compose.runtime.getValue
++import androidx.compose.runtime.mutableStateOf
++import androidx.compose.runtime.setValue
++import androidx.compose.ui.Modifier
++import androidx.compose.ui.platform.testTag
++import androidx.compose.ui.semantics.SemanticsActions
++import androidx.compose.ui.test.assertCountEquals
++import androidx.compose.ui.test.assertIsDisplayed
++import androidx.compose.ui.test.assertIsFocused
++import androidx.compose.ui.test.assertIsNotEnabled
++import androidx.compose.ui.test.junit4.createComposeRule
++import androidx.compose.ui.test.onAllNodesWithContentDescription
++import androidx.compose.ui.test.onAllNodesWithText
++import androidx.compose.ui.test.onNodeWithTag
++import androidx.compose.ui.test.onNodeWithText
++import androidx.compose.ui.test.performSemanticsAction
++import androidx.compose.ui.unit.dp
++import androidx.test.ext.junit.runners.AndroidJUnit4
++import androidx.test.platform.app.InstrumentationRegistry
++import com.nuvio.tv.domain.model.ContentType
++import com.nuvio.tv.domain.model.ContinueWatchingCardStyle
++import com.nuvio.tv.domain.model.EpisodeShuffleSettings
++import com.nuvio.tv.domain.model.Meta
++import com.nuvio.tv.domain.model.PosterShape
++import com.nuvio.tv.domain.model.Video
++import com.nuvio.tv.ui.components.ContinueWatchingCard
++import com.nuvio.tv.ui.screens.home.ContinueWatchingItem
++import com.nuvio.tv.ui.screens.home.NextUpInfo
++import com.nuvio.tv.ui.theme.NuvioTheme
++import java.io.File
++import kotlinx.coroutines.CompletableDeferred
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertNotEquals
++import org.junit.Assert.assertNull
++import org.junit.Assert.assertTrue
++import org.junit.Rule
++import org.junit.Test
++import org.junit.runner.RunWith
++
++@RunWith(AndroidJUnit4::class)
++class EpisodeShuffleTvTest {
++    @get:Rule val compose = createComposeRule()
++    private val instrumentation get() = InstrumentationRegistry.getInstrumentation()
++    private val videos = (1..4).map { Video("fixture:1:$it", "Episode $it", "2020-01-01", null,
++        season = 1, episode = it, overview = "An episode used to check shuffle playback on a TV remote.") }
++    private val meta = Meta(
++        id = "fixture", type = ContentType.SERIES, name = "Shuffle test series", poster = null,
++        posterShape = PosterShape.POSTER, background = null, logo = null, description = "TV playback controls",
++        releaseInfo = "2020", imdbRating = null, genres = emptyList(), runtime = null,
++        director = emptyList(), cast = emptyList(), videos = videos, country = null,
++        awards = null, language = null, links = emptyList()
++    )
++
++    @Test
++    fun unwatchedChoicePreviewsAndShufflesAgainBeforePlayingTheDisplayedEpisode() {
++        var settings by mutableStateOf(EpisodeShuffleSettings(false, true))
++        var played: Video? = null
++        setContent {
++            EpisodeShuffleDialog(meta, settings, { settings = it; true }, setOf(1 to 1, 1 to 3), emptyMap(),
++                {}, { played = it })
++        }
++        compose.onNodeWithText("All episodes").assertIsFocused().assertIsDisplayed()
++        capture("shuffle-choices")
++        val down = SystemClock.uptimeMillis()
++        instrumentation.sendKeySync(KeyEvent(down, down, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_CENTER, 2))
++        instrumentation.sendKeySync(KeyEvent(down, SystemClock.uptimeMillis(), KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DPAD_CENTER, 0))
++        compose.runOnIdle { assertNull(played); assertFalse(settings.enabled) }
++        instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_UP)
++        compose.onNodeWithText("Unwatched episodes").assertIsFocused()
++        instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_CENTER)
++        compose.onNodeWithText("Play episode").assertIsFocused().assertIsDisplayed()
++        val first = previewEpisode()
++        compose.runOnIdle { assertNull(played); assertFalse(settings.enabled); assertTrue(first.episode in listOf(2, 4)) }
++        capture("shuffle-preview")
++        val repeatDown = SystemClock.uptimeMillis()
++        instrumentation.sendKeySync(KeyEvent(repeatDown, repeatDown, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_CENTER, 1))
++        instrumentation.sendKeySync(KeyEvent(repeatDown, SystemClock.uptimeMillis(), KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DPAD_CENTER, 0))
++        compose.runOnIdle { assertNull(played); assertFalse(settings.enabled) }
++        instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_RIGHT)
++        compose.onNodeWithText("Shuffle again").assertIsFocused()
++        var previous = first
++        repeat(4) {
++            instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_CENTER)
++            compose.onNodeWithText("Shuffle again").assertIsFocused()
++            val next = previewEpisode()
++            assertNotEquals(previous.id, next.id)
++            assertTrue(next.episode in listOf(2, 4))
++            previous = next
++        }
++        compose.runOnIdle { assertNull(played); assertFalse(settings.enabled) }
++        instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_LEFT)
++        compose.onNodeWithText("Play episode").assertIsFocused()
++        instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_CENTER)
++        compose.runOnIdle {
++            assertEquals(EpisodeShuffleSettings(true, false), settings)
++            assertEquals(previous, played)
++        }
++    }
++
++    @Test
++    fun caughtUpShowsPreviewTheOnlyEpisodeWithoutOfferingShuffleAgain() {
++        var settings by mutableStateOf(EpisodeShuffleSettings())
++        var played: Video? = null
++        val onlyEpisode = videos.first()
++        setContent {
++            EpisodeShuffleDialog(meta.copy(videos = listOf(onlyEpisode)), settings, { settings = it; true },
++                setOf(1 to 1), emptyMap(), {}, { played = it })
++        }
++        compose.onNodeWithText("Unwatched episodes").assertIsNotEnabled()
++        compose.onNodeWithText("All episodes").assertIsFocused().assertIsDisplayed()
++        capture("shuffle-caught-up")
++        instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_CENTER)
++        compose.onNodeWithText("Play episode").assertIsFocused()
++        compose.onNodeWithText(onlyEpisode.title).assertIsDisplayed()
++        compose.onNodeWithText("Shuffle again").assertDoesNotExist()
++        compose.onNodeWithText("This is the only episode in your selection.").assertIsDisplayed()
++        compose.onNodeWithText("Watched").assertIsDisplayed()
++        compose.runOnIdle { assertNull(played); assertFalse(settings.enabled) }
++        capture("shuffle-single-preview")
++        instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_CENTER)
++        compose.runOnIdle {
++            assertEquals(onlyEpisode, played)
++            assertEquals(EpisodeShuffleSettings(true, true), settings)
++        }
++    }
++
++    @Test
++    fun playbackWaitsForSavingAndIgnoresRepeatedInput() {
++        var settings by mutableStateOf(EpisodeShuffleSettings())
++        var watched by mutableStateOf(emptySet<Pair<Int, Int>>())
++        val saved = CompletableDeferred<Unit>()
++        var saves = 0
++        var dismissals = 0
++        var played: Video? = null
++        setContent {
++            EpisodeShuffleDialog(meta, settings, {
++                saves++
++                saved.await()
++                settings = it
++                true
++            }, watched, emptyMap(), { dismissals++ }, { played = it })
++        }
++        compose.onNodeWithText("Unwatched episodes").assertIsFocused()
++        instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_CENTER)
++        compose.onNodeWithText("Play episode").assertIsFocused()
++        val preview = previewEpisode()
++        instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_CENTER)
++        compose.onNodeWithText("Starting shuffle…").assertIsDisplayed()
++        compose.runOnIdle { watched = videos.map { it.season!! to it.episode!! }.toSet() }
++        compose.onNodeWithText(preview.title).assertIsDisplayed()
++        capture("shuffle-preview-starting")
++        instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_CENTER)
++        instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK)
++        compose.runOnIdle {
++            assertEquals(1, saves)
++            assertEquals(0, dismissals)
++            assertNull(played)
++            assertFalse(settings.enabled)
++            saved.complete(Unit)
++        }
++        compose.waitForIdle()
++        compose.runOnIdle { assertEquals(EpisodeShuffleSettings(true, false), settings); assertEquals(preview, played) }
++    }
++
++    @Test
++    fun failedSaveAllowsRetryWithoutStartingPlayback() {
++        var settings by mutableStateOf(EpisodeShuffleSettings(false, true))
++        var allowSave = false
++        var played: Video? = null
++        setContent {
++            EpisodeShuffleDialog(meta, settings, {
++                if (allowSave) settings = it
++                allowSave
++            }, emptySet(), emptyMap(), {}, { played = it })
++        }
++        compose.onNodeWithText("All episodes").assertIsFocused()
++        instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_CENTER)
++        compose.onNodeWithText("Play episode").assertIsFocused()
++        val preview = previewEpisode()
++        instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_CENTER)
++        compose.runOnIdle { assertNull(played); assertFalse(settings.enabled); allowSave = true }
++        compose.onNodeWithText("Play episode").assertIsFocused()
++        assertEquals(preview, previewEpisode())
++        instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_CENTER)
++        compose.runOnIdle { assertEquals(EpisodeShuffleSettings(true, true), settings); assertEquals(preview, played) }
++    }
++
++    @Test
++    fun backFromPreviewReturnsToTheSelectedFilterWithoutSaving() {
++        var saves = 0
++        var dismissals = 0
++        var plays = 0
++        setContent {
++            EpisodeShuffleDialog(meta, EpisodeShuffleSettings(), { saves++; true }, emptySet(), emptyMap(),
++                { dismissals++ }, { plays++ })
++        }
++        compose.onNodeWithText("Unwatched episodes").assertIsFocused()
++        instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_DOWN)
++        compose.onNodeWithText("All episodes").assertIsFocused()
++        instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_CENTER)
++        compose.onNodeWithText("Play episode").assertIsFocused()
++        instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_UP)
++        compose.onNodeWithText("Back").assertIsFocused()
++        instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_CENTER)
++        compose.onNodeWithText("All episodes").assertIsFocused()
++        compose.runOnIdle { assertEquals(0, saves); assertEquals(0, dismissals); assertEquals(0, plays) }
++        instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_UP)
++        compose.onNodeWithText("Unwatched episodes").assertIsFocused()
++        instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_CENTER)
++        compose.onNodeWithText("Play episode").assertIsFocused()
++        instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK)
++        compose.onNodeWithText("Unwatched episodes").assertIsFocused()
++        instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK)
++        compose.runOnIdle { assertEquals(0, saves); assertEquals(1, dismissals); assertEquals(0, plays) }
++    }
++
++    @Test
++    fun refreshedHistoryReturnsToChoicesWhenThePreviewIsNoLongerUnwatched() {
++        var watched by mutableStateOf(emptySet<Pair<Int, Int>>())
++        var saves = 0
++        var plays = 0
++        setContent {
++            EpisodeShuffleDialog(meta, EpisodeShuffleSettings(), { saves++; true }, watched, emptyMap(),
++                {}, { plays++ })
++        }
++        compose.onNodeWithText("Unwatched episodes").assertIsFocused()
++        instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_CENTER)
++        compose.onNodeWithText("Play episode").assertIsFocused()
++        compose.runOnIdle { watched = videos.map { it.season!! to it.episode!! }.toSet() }
++        compose.onNodeWithText("All episodes").assertIsFocused()
++        compose.onNodeWithText("Unwatched episodes").assertIsNotEnabled()
++        compose.onNodeWithText("Play episode").assertDoesNotExist()
++        compose.runOnIdle { assertEquals(0, saves); assertEquals(0, plays) }
++    }
++
++    @Test
++    fun previewPreservesTheEpisodeWhenMetadataRefreshesAndHidesUnwatchedArtwork() {
++        var currentMeta by mutableStateOf(meta)
++        setContent {
++            EpisodeShuffleDialog(currentMeta, EpisodeShuffleSettings(), { true }, emptySet(), emptyMap(),
++                {}, {}, blurUnwatchedEpisodes = true)
++        }
++        compose.onNodeWithText("Unwatched episodes").assertIsFocused()
++        instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_CENTER)
++        compose.onNodeWithText("Play episode").assertIsFocused()
++        val preview = previewEpisode()
++        compose.onNodeWithText("Artwork hidden to avoid spoilers").assertIsDisplayed()
++        val longTitle = "An unexpectedly long episode title that still leaves room to choose what to watch"
++        compose.runOnIdle {
++            currentMeta = meta.copy(videos = videos.map {
++                if (it.id == preview.id) it.copy(title = longTitle, overview = "A long episode synopsis. ".repeat(40)) else it
++            })
++        }
++        compose.onNodeWithText(longTitle).assertIsDisplayed()
++        compose.onNodeWithText("S1 E${preview.episode}").assertIsDisplayed()
++        compose.onNodeWithText("Play episode").assertIsFocused().assertIsDisplayed()
++        compose.onNodeWithText("Shuffle again").assertIsDisplayed()
++        capture("shuffle-preview-long-title")
++    }
++
++    @Test
++    fun backLeavesSavedSettingsAlone() {
++        val settings = EpisodeShuffleSettings(false, true)
++        var saves = 0
++        var dismissals = 0
++        setContent {
++            EpisodeShuffleDialog(meta, settings, { saves++; true }, emptySet(), emptyMap(), { dismissals++ }, {})
++        }
++        compose.onNodeWithText("All episodes").assertIsFocused()
++        instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK)
++        compose.runOnIdle { assertEquals(1, dismissals); assertEquals(0, saves) }
++    }
++
++    @Test
++    fun emptyEpisodeListsHaveAnExit() {
++        var dismissals = 0
++        setContent {
++            EpisodeShuffleDialog(meta.copy(videos = emptyList()), EpisodeShuffleSettings(), { true },
++                emptySet(), emptyMap(), { dismissals++ }, {})
++        }
++        compose.onNodeWithText("No episodes are available to shuffle.").assertIsDisplayed()
++        compose.onNodeWithText("Close").assertIsFocused()
++        instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_CENTER)
++        compose.runOnIdle { assertEquals(1, dismissals) }
++    }
++
++    @Test
++    fun theSameButtonStopsShuffleAndThenOffersShuffleAgain() {
++        var settings by mutableStateOf(EpisodeShuffleSettings(true, false))
++        var stops = 0
++        var opens = 0
++        setContent {
++            HeroContentSection(meta, null, null, onPlayClick = {}, isInLibrary = false,
++                onToggleLibrary = {}, onLibraryLongPress = {}, isMovieWatched = false,
++                isMovieWatchedPending = false, onToggleMovieWatched = {}, showRandomEpisodeButton = true,
++                episodeShuffle = settings, onRandomEpisodeClick = {
++                    if (settings.enabled) { settings = settings.copy(enabled = false); stops++ } else opens++
++                })
++        }
++        compose.onNodeWithText("Stop shuffle").performSemanticsAction(SemanticsActions.RequestFocus) { it() }
++        capture("shuffle-detail-controls")
++        val down = SystemClock.uptimeMillis()
++        instrumentation.sendKeySync(KeyEvent(down, down, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_CENTER, 0))
++        instrumentation.sendKeySync(KeyEvent(down, SystemClock.uptimeMillis(), KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_CENTER, 1))
++        instrumentation.sendKeySync(KeyEvent(down, SystemClock.uptimeMillis(), KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DPAD_CENTER, 0))
++        compose.onNodeWithText("Shuffle").assertIsFocused().assertIsDisplayed()
++        compose.runOnIdle { assertEquals(1, stops); assertEquals(0, opens) }
++        capture("shuffle-controls-off")
++        instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_MENU)
++        compose.runOnIdle { assertEquals(1, stops); assertEquals(0, opens) }
++        instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_CENTER)
++        compose.runOnIdle { assertEquals(1, opens) }
++    }
++
++    @Test
++    fun shuffleBadgeAppearsInEveryCardStyleAndClickKeepsTheEpisode() {
++        var played: String? = null
++        val item = ContinueWatchingItem.NextUp(NextUpInfo(
++            "fixture", "series", "Shuffle test series", null, null, null, "fixture:1:3", 1, 3,
++            "Episode 3", thumbnail = null, lastWatched = 100, sortTimestamp = 100
++        ), shufflePlayback = true)
++        setContent {
++            Row(Modifier.padding(24.dp), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
++                for (style in ContinueWatchingCardStyle.entries) {
++                    ContinueWatchingCard(item, { played = item.info.videoId }, {},
++                        modifier = Modifier.testTag(style.name), cardWidth = 240.dp,
++                        imageHeight = 135.dp, cardStyle = style)
++                }
++            }
++        }
++        compose.onAllNodesWithContentDescription("Episode shuffle enabled", useUnmergedTree = true)
++            .assertCountEquals(ContinueWatchingCardStyle.entries.size)
++        compose.onNodeWithTag(ContinueWatchingCardStyle.WIDE.name)
++            .performSemanticsAction(SemanticsActions.RequestFocus) { it() }
++        instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_CENTER)
++        compose.runOnIdle { assertEquals(item.info.videoId, played) }
++        capture("shuffle-home-cards")
++    }
++
++    private fun setContent(content: @Composable () -> Unit) {
++        compose.setContent {
++            NuvioTheme {
++                Box(Modifier.fillMaxSize().background(NuvioTheme.colors.Background)) { content() }
++            }
++        }
++    }
++
++    private fun previewEpisode(): Video = videos.single {
++        compose.onAllNodesWithText(it.title).fetchSemanticsNodes().isNotEmpty()
++    }
++
++    private fun capture(name: String) {
++        compose.waitForIdle()
++        val directory = instrumentation.targetContext.getExternalFilesDir(null)!!
++        File(directory, "$name.png").outputStream().use {
++            instrumentation.uiAutomation.takeScreenshot().compress(Bitmap.CompressFormat.PNG, 100, it)
++        }
++    }
++}
+diff --git a/app/src/androidTest/java/com/nuvio/tv/ui/screens/settings/TrackingSettingsOverviewTest.kt b/app/src/androidTest/java/com/nuvio/tv/ui/screens/settings/TrackingSettingsOverviewTest.kt
+index 77d776d48..eb091558d 100644
+--- a/app/src/androidTest/java/com/nuvio/tv/ui/screens/settings/TrackingSettingsOverviewTest.kt
++++ b/app/src/androidTest/java/com/nuvio/tv/ui/screens/settings/TrackingSettingsOverviewTest.kt
+@@ -164,7 +164,8 @@ class TrackingSettingsOverviewTest {
+                     onWatchProgressClick = {},
+                     onContinueWatchingWindowClick = {},
+                     onCommentsChanged = {},
+-                    onMoreLikeThisClick = {}
++                    onMoreLikeThisClick = {},
++                    onAnimeIdClick = {}
+                 )
+             }
+         }
+@@ -184,7 +185,6 @@ class TrackingSettingsOverviewTest {
+                     state = TraktUiState(),
+                     onStartConnection = {},
+                     onRetryPolling = {},
+-                    onSync = {},
+                     onDisconnect = {},
+                     onDismiss = {}
+                 )
+@@ -207,7 +207,6 @@ class TrackingSettingsOverviewTest {
+                     ),
+                     onStartConnection = {},
+                     onRetryPolling = {},
+-                    onSync = {},
+                     onDisconnect = {},
+                     onDismiss = {}
+                 )
+@@ -241,7 +240,8 @@ class TrackingSettingsOverviewTest {
+                     onWatchProgressClick = {},
+                     onContinueWatchingWindowClick = {},
+                     onCommentsChanged = {},
+-                    onMoreLikeThisClick = {}
++                    onMoreLikeThisClick = {},
++                    onAnimeIdClick = {}
+                 )
+             }
+         }
+diff --git a/app/src/main/java/com/nuvio/tv/core/player/EpisodeShufflePlayback.kt b/app/src/main/java/com/nuvio/tv/core/player/EpisodeShufflePlayback.kt
+new file mode 100644
+index 000000000..f7547a252
+--- /dev/null
++++ b/app/src/main/java/com/nuvio/tv/core/player/EpisodeShufflePlayback.kt
+@@ -0,0 +1,88 @@
++package com.nuvio.tv.core.player
++
++import com.nuvio.tv.core.profile.ProfileManager
++import com.nuvio.tv.data.local.EpisodeShuffleStore
++import com.nuvio.tv.data.local.WatchedItemsPreferences
++import com.nuvio.tv.domain.model.EpisodeShuffle
++import com.nuvio.tv.domain.model.EpisodeShuffleSettings
++import com.nuvio.tv.domain.model.ShuffleSurface
++import com.nuvio.tv.domain.model.Video
++import com.nuvio.tv.domain.model.WatchProgress
++import com.nuvio.tv.domain.repository.WatchProgressRepository
++import com.nuvio.tv.ui.screens.player.PlayerNextEpisodeRules
++import kotlinx.coroutines.flow.combine
++import kotlinx.coroutines.flow.first
++import javax.inject.Inject
++import javax.inject.Singleton
++
++data class PlaybackShuffleState(
++    val settings: EpisodeShuffleSettings,
++    val watched: Set<Pair<Int, Int>>,
++    val progress: Map<Pair<Int, Int>, WatchProgress>
++)
++
++@Singleton
++class EpisodeShufflePlayback @Inject constructor(
++    private val store: EpisodeShuffleStore,
++    private val shuffle: EpisodeShuffle,
++    private val progressRepository: WatchProgressRepository,
++    private val watchedPreferences: WatchedItemsPreferences,
++    private val profileManager: ProfileManager
++) {
++    fun observe(profileId: Int, contentId: String, contentType: String) = combine(
++        store.observeProfile(profileId),
++        progressRepository.getAllEpisodeProgress(contentId, profileId),
++        watchedPreferences.getWatchedEpisodesForContent(contentId, profileId)
++    ) { profile, progress, watched ->
++        PlaybackShuffleState(profile.settings(contentId, contentType), watched, progress)
++    }
++
++    suspend fun isEnabled(metadata: ExternalPlaybackMetadata): Boolean =
++        store.observeProfile(metadata.profileId).first()
++            .settings(metadata.contentId, metadata.contentType).enabled
++
++    fun nextEpisode(
++        profileId: Int,
++        contentId: String,
++        videos: List<Video>,
++        season: Int?,
++        episode: Int,
++        state: PlaybackShuffleState,
++        preferredVideoId: String? = null
++    ): Video? {
++        if (!state.settings.enabled) {
++            shuffle.clearSelection(profileId, contentId, ShuffleSurface.PLAYBACK)
++            return PlayerNextEpisodeRules.resolveNextEpisode(videos, season, episode)
++        }
++        val remoteWatched = if (!state.settings.includeWatched && profileManager.activeProfileId.value == profileId) {
++            videos.filter { video ->
++                video.episode?.let { progressRepository.isWatchedByVideoId(video.id, it) } == true
++            }.mapNotNull { video -> video.season?.let { it to video.episode!! } }.toSet()
++        } else emptySet()
++        return shuffle.select(
++            profileId, contentId, videos, state.settings.includeWatched,
++            state.watched + remoteWatched, state.progress, ShuffleSurface.PLAYBACK,
++            current = season?.let { it to episode }, preferredVideoId = preferredVideoId
++        )
++    }
++
++    suspend fun externalSnapshot(
++        metadata: ExternalPlaybackMetadata,
++        videos: List<Video>,
++        preferredVideoId: String? = null
++    ): ExternalNextEpisodeSnapshot {
++        val state = observe(metadata.profileId, metadata.contentId, metadata.contentType).first()
++        if (!state.settings.enabled) {
++            shuffle.clearSelection(metadata.profileId, metadata.contentId, ShuffleSurface.PLAYBACK)
++            return resolveExternalNextEpisodeSnapshot(videos, metadata.season, metadata.episode)
++        }
++        val episode = metadata.episode ?: return ExternalNextEpisodeSnapshot.Unknown
++        val season = metadata.season ?: videos.firstOrNull { it.id == metadata.videoId }?.season
++        val next = nextEpisode(metadata.profileId, metadata.contentId, videos,
++            season, episode, state, preferredVideoId)
++        return ExternalNextEpisodeSnapshot(
++            metadataResolved = true, nextVideoId = next?.id, nextSeason = next?.season,
++            nextEpisode = next?.episode, shufflePlayback = true
++        )
++    }
++}
+diff --git a/app/src/main/java/com/nuvio/tv/core/player/ExternalPlaybackTracker.kt b/app/src/main/java/com/nuvio/tv/core/player/ExternalPlaybackTracker.kt
+index 68f8d8cbb..acf1bdfc5 100644
+--- a/app/src/main/java/com/nuvio/tv/core/player/ExternalPlaybackTracker.kt
++++ b/app/src/main/java/com/nuvio/tv/core/player/ExternalPlaybackTracker.kt
+@@ -112,7 +112,8 @@ data class ExternalNextEpisodeSnapshot(
+     val metadataResolved: Boolean,
+     val nextVideoId: String? = null,
+     val nextSeason: Int? = null,
+-    val nextEpisode: Int? = null
++    val nextEpisode: Int? = null,
++    val shufflePlayback: Boolean = false
+ ) {
+     val hasNextEpisode: Boolean?
+         get() = if (!metadataResolved) null else nextVideoId != null && nextEpisode != null
+@@ -174,6 +175,7 @@ class ExternalPlaybackTracker @Inject constructor(
+     private val watchProgressRepository: WatchProgressRepository,
+     private val trackingScrobbleCoordinator: TrackingScrobbleCoordinator,
+     private val metaRepository: MetaRepository,
++    private val episodeShufflePlayback: EpisodeShufflePlayback,
+     private val playerSettingsDataStore: PlayerSettingsDataStore,
+     private val skipIntroRepository: SkipIntroRepository,
+     private val cloudLibraryRepository: CloudLibraryRepository,
+@@ -761,6 +763,7 @@ class ExternalPlaybackTracker @Inject constructor(
+             .putBoolean("autoNextEnabled", autoNextEnabled == true)
+             .putBoolean("nextEpisodeSnapshotPresent", true)
+             .putBoolean("nextEpisodeMetadataResolved", snapshot.metadataResolved)
++            .putBoolean("nextEpisodeShufflePlayback", snapshot.shufflePlayback)
+             .putString("nextEpisodeVideoId", snapshot.nextVideoId)
+             .putInt("nextEpisodeSeason", snapshot.nextSeason ?: Int.MIN_VALUE)
+             .putInt("nextEpisodeNumber", snapshot.nextEpisode ?: Int.MIN_VALUE)
+@@ -781,6 +784,7 @@ class ExternalPlaybackTracker @Inject constructor(
+         return ExternalNextEpisodeSnapshot(
+             metadataResolved = p.getBoolean("nextEpisodeMetadataResolved", false),
+             nextVideoId = p.getString("nextEpisodeVideoId", null),
++            shufflePlayback = p.getBoolean("nextEpisodeShufflePlayback", false),
+             nextSeason = p.getInt("nextEpisodeSeason", Int.MIN_VALUE)
+                 .takeIf { it != Int.MIN_VALUE },
+             nextEpisode = p.getInt("nextEpisodeNumber", Int.MIN_VALUE)
+@@ -840,7 +844,8 @@ class ExternalPlaybackTracker @Inject constructor(
+                 if (refreshedSnapshot.metadataResolved) {
+                     // Keep a playable successor captured from the screen's complete episode list
+                     // if a background addon refresh returns a thinner list with no successor.
+-                    val keepLoadedSuccessor = nextEpisodeSnapshot.hasNextEpisode == true &&
++                    val keepLoadedSuccessor = !refreshedSnapshot.shufflePlayback &&
++                        nextEpisodeSnapshot.hasNextEpisode == true &&
+                         refreshedSnapshot.hasNextEpisode == false
+                     if (!keepLoadedSuccessor) {
+                         nextEpisodeSnapshot = refreshedSnapshot
+@@ -877,9 +882,25 @@ class ExternalPlaybackTracker @Inject constructor(
+         }
+     }
+ 
++    private var loadedNextEpisodeMeta: Pair<ExternalPlaybackMetadata, List<Video>>? = null
++
++    suspend fun resolveNextEpisodeSnapshot(
++        metadata: ExternalPlaybackMetadata,
++        videos: List<Video>,
++        preferredVideoId: String? = null
++    ): ExternalNextEpisodeSnapshot {
++        loadedNextEpisodeMeta = metadata to videos
++        return episodeShufflePlayback.externalSnapshot(metadata, videos, preferredVideoId)
++    }
++
+     private suspend fun resolveNextEpisodeSnapshot(
+-        metadata: ExternalPlaybackMetadata
++        metadata: ExternalPlaybackMetadata,
++        preferredVideoId: String? = null
+     ): ExternalNextEpisodeSnapshot {
++        val loaded = loadedNextEpisodeMeta?.takeIf { it.first == metadata }?.second
++        if (loaded != null && episodeShufflePlayback.isEnabled(metadata)) {
++            return resolveNextEpisodeSnapshot(metadata, loaded, preferredVideoId)
++        }
+         val result = withTimeoutOrNull(META_FETCH_TIMEOUT_MS) {
+             metaRepository
+                 .getMetaFromAllAddons(type = metadata.contentType, id = metadata.contentId)
+@@ -887,11 +908,7 @@ class ExternalPlaybackTracker @Inject constructor(
+         }
+         val meta = (result as? NetworkResult.Success)?.data
+             ?: return ExternalNextEpisodeSnapshot.Unknown
+-        return resolveExternalNextEpisodeSnapshot(
+-            videos = meta.videos,
+-            currentSeason = metadata.season,
+-            currentEpisode = metadata.episode
+-        )
++        return resolveNextEpisodeSnapshot(metadata, meta.videos, preferredVideoId)
+     }
+ 
+     // True on a natural end (end_by != "user"), or for players without end_by once the
+@@ -965,6 +982,15 @@ class ExternalPlaybackTracker @Inject constructor(
+                     if (prefetchJob.isActive) prefetchJob.cancel()
+                 }
+             }
++            if (nextEpisodeSnapshot.shufflePlayback || episodeShufflePlayback.isEnabled(metadata)) {
++                val loaded = loadedNextEpisodeMeta?.takeIf { it.first == metadata }?.second
++                nextEpisodeSnapshot = if (loaded != null) {
++                    resolveNextEpisodeSnapshot(metadata, loaded, nextEpisodeSnapshot.nextVideoId)
++                } else {
++                    resolveNextEpisodeSnapshot(metadata, preferredVideoId = nextEpisodeSnapshot.nextVideoId)
++                }
++                persistAutoNextState(nextEpisodeSnapshot, autoPlayNextEnabled)
++            }
+             val resolvedSnapshot = nextEpisodeSnapshot.takeIf { it.metadataResolved }
+                 ?: resolveNextEpisodeSnapshot(metadata).also { refreshed ->
+                     if (refreshed.metadataResolved) {
+diff --git a/app/src/main/java/com/nuvio/tv/data/local/EpisodeShuffleStore.kt b/app/src/main/java/com/nuvio/tv/data/local/EpisodeShuffleStore.kt
+new file mode 100644
+index 000000000..544d5e306
+--- /dev/null
++++ b/app/src/main/java/com/nuvio/tv/data/local/EpisodeShuffleStore.kt
+@@ -0,0 +1,58 @@
++package com.nuvio.tv.data.local
++
++import androidx.datastore.preferences.core.Preferences
++import androidx.datastore.preferences.core.booleanPreferencesKey
++import androidx.datastore.preferences.core.edit
++import com.nuvio.tv.core.profile.ProfileManager
++import com.nuvio.tv.domain.model.EpisodeShuffleSettings
++import kotlinx.coroutines.flow.combine
++import kotlinx.coroutines.flow.flatMapLatest
++import javax.inject.Inject
++import javax.inject.Singleton
++
++data class EpisodeShuffleProfile(
++    val profileId: Int,
++    val available: Boolean = false,
++    val shows: Map<String, EpisodeShuffleSettings> = emptyMap()
++) {
++    fun settings(contentId: String, contentType: String): EpisodeShuffleSettings {
++        val saved = shows[contentId] ?: EpisodeShuffleSettings()
++        return saved.copy(enabled = saved.enabled && available &&
++            (contentType.equals("series", true) || contentType.equals("tv", true)))
++    }
++}
++
++@Singleton
++class EpisodeShuffleStore @Inject constructor(
++    private val factory: ProfileDataStoreFactory,
++    private val profileManager: ProfileManager,
++    private val layoutPreferences: LayoutPreferenceDataStore
++) {
++    val profiles = profileManager.activeProfileId.flatMapLatest(::observeProfile)
++
++    fun observeProfile(profileId: Int) = combine(
++        factory.get(profileId, "episode_shuffle").data,
++        layoutPreferences.randomEpisodeEnabledForProfile(profileId)
++    ) { preferences, available ->
++        EpisodeShuffleProfile(profileId, available, readShuffleSettings(preferences))
++    }
++
++    suspend fun save(contentId: String, settings: EpisodeShuffleSettings, profileId: Int) {
++        if (contentId.isBlank()) return
++        factory.get(profileId, "episode_shuffle").edit {
++            it[booleanPreferencesKey("enabled:$contentId")] = settings.enabled
++            it[booleanPreferencesKey("watched:$contentId")] = settings.includeWatched
++        }
++    }
++}
++
++internal fun readShuffleSettings(preferences: Preferences): Map<String, EpisodeShuffleSettings> =
++    preferences.asMap().keys.mapNotNull { key ->
++        key.name.takeIf { it.startsWith("enabled:") || it.startsWith("watched:") }
++            ?.substringAfter(':')?.takeIf(String::isNotBlank)
++    }.distinct().associateWith { id ->
++        EpisodeShuffleSettings(
++            enabled = preferences[booleanPreferencesKey("enabled:$id")] ?: false,
++            includeWatched = preferences[booleanPreferencesKey("watched:$id")] ?: false
++        )
++    }
+diff --git a/app/src/main/java/com/nuvio/tv/data/local/LayoutPreferenceDataStore.kt b/app/src/main/java/com/nuvio/tv/data/local/LayoutPreferenceDataStore.kt
+index 302e57fc8..08bd3b828 100644
+--- a/app/src/main/java/com/nuvio/tv/data/local/LayoutPreferenceDataStore.kt
++++ b/app/src/main/java/com/nuvio/tv/data/local/LayoutPreferenceDataStore.kt
+@@ -102,6 +102,7 @@ class LayoutPreferenceDataStore @Inject constructor(
+     private val cardDepthCastEnabledKey = booleanPreferencesKey("card_depth_cast_enabled")
+     private val cardDepthTrailersEnabledKey = booleanPreferencesKey("card_depth_trailers_enabled")
+     private val blurUnwatchedEpisodesKey = booleanPreferencesKey("blur_unwatched_episodes")
++    private val randomEpisodeEnabledKey = booleanPreferencesKey("random_episode_enabled")
+     private val startupSplashEnabledKey = booleanPreferencesKey("startup_splash_enabled")
+     private val episodeOptionsOverlayStyleKey = stringPreferencesKey("episode_options_overlay_style")
+     private val homeImdbRatingsVisibilityKey = stringPreferencesKey("home_imdb_ratings_visibility")
+@@ -333,6 +334,13 @@ class LayoutPreferenceDataStore @Inject constructor(
+         prefs[blurUnwatchedEpisodesKey] ?: false
+     }
+ 
++    val randomEpisodeEnabled: Flow<Boolean> = profileFlow { prefs ->
++        prefs[randomEpisodeEnabledKey] ?: false
++    }
++
++    fun randomEpisodeEnabledForProfile(profileId: Int): Flow<Boolean> =
++        factory.get(profileId, FEATURE).data.map { it[randomEpisodeEnabledKey] ?: false }
++
+     val startupSplashEnabled: Flow<Boolean> = profileFlow { prefs ->
+         prefs[startupSplashEnabledKey] ?: true
+     }
+@@ -685,6 +693,12 @@ class LayoutPreferenceDataStore @Inject constructor(
+         }
+     }
+ 
++    suspend fun setRandomEpisodeEnabled(enabled: Boolean) {
++        store().edit { prefs ->
++            prefs[randomEpisodeEnabledKey] = enabled
++        }
++    }
++
+     suspend fun setStartupSplashEnabled(enabled: Boolean) {
+         store().edit { prefs ->
+             prefs[startupSplashEnabledKey] = enabled
+diff --git a/app/src/main/java/com/nuvio/tv/domain/model/EpisodeShuffle.kt b/app/src/main/java/com/nuvio/tv/domain/model/EpisodeShuffle.kt
+new file mode 100644
+index 000000000..87b457dba
+--- /dev/null
++++ b/app/src/main/java/com/nuvio/tv/domain/model/EpisodeShuffle.kt
+@@ -0,0 +1,66 @@
++package com.nuvio.tv.domain.model
++
++import javax.inject.Inject
++import javax.inject.Singleton
++
++data class EpisodeShuffleSettings(
++    val enabled: Boolean = false,
++    val includeWatched: Boolean = false
++)
++
++enum class ShuffleSurface { DETAIL, HOME, PLAYBACK }
++
++@Singleton
++class EpisodeShuffle @Inject constructor() {
++    private data class Key(
++        val profileId: Int,
++        val contentId: String,
++        val surface: ShuffleSurface,
++        val includeWatched: Boolean
++    )
++
++    private class Session {
++        var picker: RandomEpisodePicker? = null
++        var selected: Video? = null
++        var current: Pair<Int, Int>? = null
++        var visit: Long = 0
++    }
++
++    private val sessions = LinkedHashMap<Key, Session>(16, 0.75f, true)
++
++    @Synchronized
++    fun select(
++        profileId: Int,
++        contentId: String,
++        videos: List<Video>,
++        includeWatched: Boolean,
++        watched: Set<Pair<Int, Int>> = emptySet(),
++        progress: Map<Pair<Int, Int>, WatchProgress> = emptyMap(),
++        surface: ShuffleSurface,
++        current: Pair<Int, Int>? = null,
++        visit: Long = 0,
++        preferredVideoId: String? = null
++    ): Video? {
++        val key = Key(profileId, contentId, surface, includeWatched)
++        val session = sessions.getOrPut(key, ::Session)
++        while (sessions.size > 96) sessions.remove(sessions.keys.first())
++        val picker = RandomEpisodePicker(contentId, videos, watched, progress)
++        picker.inheritHistoryFrom(session.picker)
++        if (current != null && (session.picker == null || session.current != current)) picker.recordPlayed(current)
++        session.picker = picker
++        if (session.current != current || session.visit != visit) session.selected = null
++        session.current = current
++        session.visit = visit
++        session.selected = session.selected?.let { picker.find(it.id, includeWatched, current) }
++            ?: preferredVideoId?.let { picker.find(it, includeWatched, current) }
++            ?: picker.pick(includeWatched, current, consumeSelection = surface != ShuffleSurface.PLAYBACK || current == null)
++        return session.selected
++    }
++
++    @Synchronized
++    fun clearSelection(profileId: Int, contentId: String, surface: ShuffleSurface) {
++        sessions.filterKeys {
++            it.profileId == profileId && it.contentId == contentId && it.surface == surface
++        }.values.forEach { it.selected = null }
++    }
++}
+diff --git a/app/src/main/java/com/nuvio/tv/domain/model/Meta.kt b/app/src/main/java/com/nuvio/tv/domain/model/Meta.kt
+index 081bdf170..1129b15fb 100644
+--- a/app/src/main/java/com/nuvio/tv/domain/model/Meta.kt
++++ b/app/src/main/java/com/nuvio/tv/domain/model/Meta.kt
+@@ -58,22 +58,24 @@ data class Meta(
+      * excluding entire seasons where the first episode is not yet available
+      * (either via the `available` flag or because its release date is in the future).
+      */
+-    fun watchableEpisodes(): List<Video> {
+-        val candidates = videos.filter {
+-            it.season != null && it.episode != null && (it.season ?: 0) > 0
+-        }
+-        fun isFutureRelease(raw: String?): Boolean = isEpisodeReleaseAired(raw) == false
+-        val unavailableSeasons = candidates.groupBy { it.season }
+-            .filter { (_, eps) ->
+-                val first = eps.minByOrNull { it.episode ?: Int.MAX_VALUE }
+-                    ?: return@filter false
+-                if (first.available == false) return@filter true
+-                isFutureRelease(first.released)
+-            }.keys
+-        return candidates
+-            .filter { it.season !in unavailableSeasons }
+-            .filter { it.available != false && !isFutureRelease(it.released) }
++    fun watchableEpisodes(): List<Video> = videos.watchableEpisodes()
++}
++
++fun List<Video>.watchableEpisodes(): List<Video> {
++    val candidates = filter {
++        it.season != null && it.episode != null && (it.season ?: 0) > 0
+     }
++    fun isFutureRelease(raw: String?): Boolean = isEpisodeReleaseAired(raw) == false
++    val unavailableSeasons = candidates.groupBy { it.season }
++        .filter { (_, eps) ->
++            val first = eps.minByOrNull { it.episode ?: Int.MAX_VALUE }
++                ?: return@filter false
++            if (first.available == false) return@filter true
++            isFutureRelease(first.released)
++        }.keys
++    return candidates
++        .filter { it.season !in unavailableSeasons }
++        .filter { it.available != false && !isFutureRelease(it.released) }
+ }
+ 
+ /**
+diff --git a/app/src/main/java/com/nuvio/tv/domain/model/RandomEpisodePicker.kt b/app/src/main/java/com/nuvio/tv/domain/model/RandomEpisodePicker.kt
+new file mode 100644
+index 000000000..faf1b5c8c
+--- /dev/null
++++ b/app/src/main/java/com/nuvio/tv/domain/model/RandomEpisodePicker.kt
+@@ -0,0 +1,67 @@
++package com.nuvio.tv.domain.model
++
++import kotlin.random.Random
++
++internal class RandomEpisodePicker(
++    private val contentId: String,
++    videos: List<Video>,
++    watchedEpisodes: Set<Pair<Int, Int>>,
++    episodeProgress: Map<Pair<Int, Int>, WatchProgress>,
++    private val random: Random = Random.Default
++) {
++    constructor(
++        meta: Meta,
++        watchedEpisodes: Set<Pair<Int, Int>>,
++        episodeProgress: Map<Pair<Int, Int>, WatchProgress>,
++        random: Random = Random.Default
++    ) : this(meta.id, meta.videos, watchedEpisodes, episodeProgress, random)
++
++    private val episodes = videos.watchableEpisodes()
++        .filter { it.id.isNotBlank() && (it.episode ?: 0) > 0 }
++        .distinctBy { it.season to it.episode }
++        .distinctBy { it.id }
++    private val watchedKeys = watchedEpisodes + episodeProgress
++        .filterValues { it.isCompleted() }
++        .keys
++    private val unwatchedEpisodes = episodes.filterNot { isWatched(it) }
++    private val shownIds = mutableSetOf<String>()
++    private var lastPickedId: String? = null
++
++    fun count(includeWatched: Boolean): Int = candidates(includeWatched).size
++
++    fun isWatched(episode: Video): Boolean = (episode.season to episode.episode) in watchedKeys
++
++    fun find(videoId: String, includeWatched: Boolean, current: Pair<Int, Int>? = null): Video? =
++        candidates(includeWatched).firstOrNull { it.id == videoId && it.season to it.episode != current }
++
++    fun inheritHistoryFrom(previous: RandomEpisodePicker?) {
++        if (previous == null || previous.contentId != contentId) return
++        shownIds.addAll(previous.shownIds)
++        lastPickedId = previous.lastPickedId
++    }
++
++    fun recordPlayed(current: Pair<Int, Int>) {
++        episodes.firstOrNull { it.season to it.episode == current }?.let { shownIds.add(it.id) }
++    }
++
++    fun pick(
++        includeWatched: Boolean,
++        current: Pair<Int, Int>? = null,
++        consumeSelection: Boolean = true
++    ): Video? {
++        val candidates = candidates(includeWatched).filterNot { it.season to it.episode == current }
++        if (candidates.isEmpty()) return null
++        val unseen = candidates.filterNot { it.id in shownIds }
++        val pool = unseen.ifEmpty {
++            if (consumeSelection) shownIds.removeAll(candidates.map { it.id }.toSet()) else shownIds.clear()
++            candidates.filterNot { it.id == lastPickedId }.ifEmpty { candidates }
++        }
++        return pool.random(random).also {
++            if (consumeSelection) shownIds.add(it.id)
++            lastPickedId = it.id
++        }
++    }
++
++    private fun candidates(includeWatched: Boolean): List<Video> =
++        if (includeWatched) episodes else unwatchedEpisodes
++}
+diff --git a/app/src/main/java/com/nuvio/tv/ui/components/ContinueWatchingSection.kt b/app/src/main/java/com/nuvio/tv/ui/components/ContinueWatchingSection.kt
+index c5bb28927..c644f8a34 100644
+--- a/app/src/main/java/com/nuvio/tv/ui/components/ContinueWatchingSection.kt
++++ b/app/src/main/java/com/nuvio/tv/ui/components/ContinueWatchingSection.kt
+@@ -1,5 +1,7 @@
+ package com.nuvio.tv.ui.components
+ 
++import com.nuvio.tv.ui.screens.home.shuffleFocusKey
++
+ import android.view.KeyEvent as AndroidKeyEvent
+ import androidx.compose.foundation.BorderStroke
+ import androidx.compose.foundation.background
+@@ -246,7 +248,7 @@ fun ContinueWatchingSection(
+             itemsIndexed(
+                 items = items,
+                 key = { _, progress ->
+-                    when (progress) {
++                    progress.shuffleFocusKey ?: when (progress) {
+                         is ContinueWatchingItem.InProgress ->
+                             "cw_${progress.progress.contentId}_${progress.progress.videoId}_${progress.progress.season ?: -1}_${progress.progress.episode ?: -1}"
+                         is ContinueWatchingItem.NextUp ->
+@@ -679,6 +681,7 @@ fun ContinueWatchingCard(
+                 badgeText = badgeText,
+                 badgeBackground = badgeBackground,
+                 showBadge = progress == null,
++                shufflePlayback = item.shufflePlayback,
+                 progressFraction = progressFraction,
+                 hasProgress = progress != null,
+                 onImageError = {
+@@ -784,6 +787,8 @@ fun ContinueWatchingCard(
+                     )
+                 }
+ 
++                if (item.shufflePlayback) EpisodeShuffleBadge(Modifier.align(Alignment.TopStart))
++
+                 // Content info at bottom
+                 if (!textBelowArtwork) {
+                     Column(
+@@ -922,6 +927,7 @@ private fun WideCardContent(
+     badgeText: String,
+     badgeBackground: Color,
+     showBadge: Boolean,
++    shufflePlayback: Boolean,
+     progressFraction: Float,
+     hasProgress: Boolean,
+     onImageError: () -> Unit
+@@ -960,6 +966,7 @@ private fun WideCardContent(
+                     onError = { onImageError() }
+                 )
+             }
++            if (shufflePlayback) EpisodeShuffleBadge(Modifier.align(Alignment.TopStart))
+         }
+ 
+         Column(
+diff --git a/app/src/main/java/com/nuvio/tv/ui/components/EpisodeShuffleBadge.kt b/app/src/main/java/com/nuvio/tv/ui/components/EpisodeShuffleBadge.kt
+new file mode 100644
+index 000000000..83702247e
+--- /dev/null
++++ b/app/src/main/java/com/nuvio/tv/ui/components/EpisodeShuffleBadge.kt
+@@ -0,0 +1,26 @@
++package com.nuvio.tv.ui.components
++
++import androidx.compose.foundation.background
++import androidx.compose.foundation.layout.padding
++import androidx.compose.foundation.layout.size
++import androidx.compose.foundation.shape.CircleShape
++import androidx.compose.material.icons.Icons
++import androidx.compose.material.icons.filled.Shuffle
++import androidx.compose.runtime.Composable
++import androidx.compose.ui.Modifier
++import androidx.compose.ui.graphics.Color
++import androidx.compose.ui.res.stringResource
++import androidx.compose.ui.unit.dp
++import androidx.tv.material3.Icon
++import com.nuvio.tv.R
++
++@Composable
++internal fun EpisodeShuffleBadge(modifier: Modifier = Modifier) {
++    Icon(
++        imageVector = Icons.Default.Shuffle,
++        contentDescription = stringResource(R.string.shuffle_badge),
++        tint = Color.White,
++        modifier = modifier.padding(8.dp).background(Color.Black.copy(alpha = 0.8f), CircleShape)
++            .padding(6.dp).size(18.dp)
++    )
++}
+diff --git a/app/src/main/java/com/nuvio/tv/ui/components/GridContinueWatchingSection.kt b/app/src/main/java/com/nuvio/tv/ui/components/GridContinueWatchingSection.kt
+index 2c6001c8f..839377fd1 100644
+--- a/app/src/main/java/com/nuvio/tv/ui/components/GridContinueWatchingSection.kt
++++ b/app/src/main/java/com/nuvio/tv/ui/components/GridContinueWatchingSection.kt
+@@ -1,5 +1,7 @@
+ package com.nuvio.tv.ui.components
+ 
++import com.nuvio.tv.ui.screens.home.shuffleFocusKey
++
+ import com.nuvio.tv.ui.theme.NuvioTheme
+ 
+ import androidx.compose.foundation.layout.Arrangement
+@@ -134,7 +136,7 @@ fun GridContinueWatchingSection(
+             itemsIndexed(
+                 items = items,
+                 key = { _, item ->
+-                    when (item) {
++                    item.shuffleFocusKey ?: when (item) {
+                         is ContinueWatchingItem.InProgress ->
+                             "cw_${item.progress.contentId}_${item.progress.videoId}_${item.progress.season ?: -1}_${item.progress.episode ?: -1}"
+                         is ContinueWatchingItem.NextUp ->
+diff --git a/app/src/main/java/com/nuvio/tv/ui/screens/detail/DetailEpisodeShuffle.kt b/app/src/main/java/com/nuvio/tv/ui/screens/detail/DetailEpisodeShuffle.kt
+new file mode 100644
+index 000000000..7039f4235
+--- /dev/null
++++ b/app/src/main/java/com/nuvio/tv/ui/screens/detail/DetailEpisodeShuffle.kt
+@@ -0,0 +1,78 @@
++package com.nuvio.tv.ui.screens.detail
++
++import android.content.Context
++import com.nuvio.tv.R
++import com.nuvio.tv.data.local.EpisodeShuffleProfile
++import com.nuvio.tv.domain.model.ContentType
++import com.nuvio.tv.domain.model.EpisodeShuffle
++import com.nuvio.tv.domain.model.Meta
++import com.nuvio.tv.domain.model.NextToWatch
++import com.nuvio.tv.domain.model.ShuffleSurface
++import com.nuvio.tv.domain.model.Video
++import com.nuvio.tv.domain.model.WatchProgress
++
++internal fun applyDetailShuffle(
++    state: MetaDetailsUiState,
++    profile: EpisodeShuffleProfile,
++    continueWatching: List<WatchProgress>,
++    shuffle: EpisodeShuffle,
++    visit: Long,
++    context: Context
++): MetaDetailsUiState {
++    val meta = state.meta ?: return state
++    val settings = profile.settings(meta.id, meta.apiType)
++    val result = state.copy(randomEpisodeEnabled = profile.available, episodeShuffle = settings, shufflePoolEmpty = false)
++    if (!settings.enabled) {
++        shuffle.clearSelection(profile.profileId, meta.id, ShuffleSurface.DETAIL)
++        return result
++    }
++    val resume = continueWatching.asSequence().filter {
++        (it.contentId == meta.id || it.contentId == meta.imdbId) &&
++            (it.contentType.equals("series", true) || it.contentType.equals("tv", true)) &&
++            it.season != null && it.episode != null && it.videoId.isNotBlank() &&
++            !it.isCompleted() && (it.position > 0 || it.progressPercentage > 0)
++    }.maxByOrNull { it.lastWatched }
++    if (resume != null) {
++        return result.copy(nextToWatch = NextToWatch(
++            watchProgress = resume, isResume = true, nextVideoId = resume.videoId,
++            nextSeason = resume.season, nextEpisode = resume.episode,
++            displayText = context.getString(R.string.detail_btn_resume_episode, resume.season, resume.episode)
++        ))
++    }
++    val selected = shuffle.select(
++        profile.profileId, meta.id, meta.videos, settings.includeWatched,
++        state.watchedEpisodes, state.episodeProgressMap, ShuffleSurface.DETAIL, visit = visit
++    )
++    return result.copy(
++        shufflePoolEmpty = selected == null,
++        nextToWatch = NextToWatch(
++            watchProgress = null, isResume = false, nextVideoId = selected?.id,
++            nextSeason = selected?.season, nextEpisode = selected?.episode,
++            displayText = if (selected == null) context.getString(R.string.shuffle_change_selection)
++                else context.getString(R.string.detail_btn_play_episode, selected.season, selected.episode)
++        )
++    )
++}
++
++internal fun resolveHeroPlaybackVideo(
++    meta: Meta,
++    nextToWatch: NextToWatch?,
++    episodesForSeason: List<Video>
++): Video? {
++    if (meta.type != ContentType.SERIES && meta.videos.isEmpty()) return null
++    nextToWatch?.nextVideoId?.let { id -> meta.videos.firstOrNull { it.id == id }?.let { return it } }
++    nextToWatch?.takeIf { it.isResume }?.watchProgress?.let { progress ->
++        return Video(
++            id = progress.videoId, title = progress.episodeTitle.orEmpty(), released = null,
++            thumbnail = null, season = progress.season, episode = progress.episode, overview = null
++        )
++    }
++    if (nextToWatch?.nextSeason != null && nextToWatch.nextEpisode != null) {
++        meta.videos.firstOrNull {
++            it.season == nextToWatch.nextSeason && it.episode == nextToWatch.nextEpisode
++        }?.let { return it }
++    }
++    return meta.videos.firstOrNull {
++        it.id == meta.behaviorHints?.defaultVideoId && it.available != false
++    } ?: episodesForSeason.firstOrNull()
++}
+diff --git a/app/src/main/java/com/nuvio/tv/ui/screens/detail/EpisodeShuffleDialog.kt b/app/src/main/java/com/nuvio/tv/ui/screens/detail/EpisodeShuffleDialog.kt
+new file mode 100644
+index 000000000..2937cc974
+--- /dev/null
++++ b/app/src/main/java/com/nuvio/tv/ui/screens/detail/EpisodeShuffleDialog.kt
+@@ -0,0 +1,135 @@
++package com.nuvio.tv.ui.screens.detail
++
++import androidx.compose.foundation.layout.fillMaxWidth
++import androidx.compose.runtime.Composable
++import androidx.compose.runtime.LaunchedEffect
++import androidx.compose.runtime.getValue
++import androidx.compose.runtime.mutableStateOf
++import androidx.compose.runtime.produceState
++import androidx.compose.runtime.remember
++import androidx.compose.runtime.rememberCoroutineScope
++import androidx.compose.runtime.setValue
++import androidx.compose.ui.Modifier
++import androidx.compose.ui.focus.FocusRequester
++import androidx.compose.ui.focus.focusRequester
++import androidx.compose.ui.res.stringResource
++import androidx.compose.ui.unit.dp
++import androidx.tv.material3.Button
++import androidx.tv.material3.ButtonDefaults
++import androidx.tv.material3.Text
++import com.nuvio.tv.R
++import com.nuvio.tv.domain.model.EpisodeShuffleSettings
++import com.nuvio.tv.domain.model.Meta
++import com.nuvio.tv.domain.model.RandomEpisodePicker
++import com.nuvio.tv.domain.model.Video
++import com.nuvio.tv.domain.model.WatchProgress
++import com.nuvio.tv.ui.components.NuvioDialog
++import com.nuvio.tv.ui.theme.NuvioTheme
++import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.launch
++import kotlinx.coroutines.withContext
++
++@Composable
++internal fun EpisodeShuffleDialog(
++    meta: Meta,
++    shuffleSettings: EpisodeShuffleSettings,
++    onSaveSettings: suspend (EpisodeShuffleSettings) -> Boolean,
++    watchedEpisodes: Set<Pair<Int, Int>>,
++    episodeProgress: Map<Pair<Int, Int>, WatchProgress>,
++    onDismiss: () -> Unit,
++    onPlay: (Video) -> Unit,
++    blurUnwatchedEpisodes: Boolean = false,
++    showManualPlayOption: Boolean = false,
++    onPlayManually: (Video) -> Unit = onPlay,
++    onStartFromBeginning: (Video) -> Unit = onPlay
++) {
++    val picker by produceState<RandomEpisodePicker?>(null, meta.videos, watchedEpisodes, episodeProgress) {
++        val updated = withContext(Dispatchers.Default) { RandomEpisodePicker(meta, watchedEpisodes, episodeProgress) }
++        updated.inheritHistoryFrom(value)
++        value = updated
++    }
++    var starting by remember { mutableStateOf(false) }
++    var selectedEpisode by remember { mutableStateOf<Video?>(null) }
++    var includeWatched by remember { mutableStateOf(shuffleSettings.includeWatched) }
++    val focusRequester = remember { FocusRequester() }
++    val scope = rememberCoroutineScope()
++    val readyPicker = picker
++    val unwatchedCount = readyPicker?.count(false) ?: 0
++    val allCount = readyPicker?.count(true) ?: 0
++    val focusAll = includeWatched || unwatchedCount == 0
++    val previewEpisode = if (starting) selectedEpisode else selectedEpisode?.let { readyPicker?.find(it.id, includeWatched) }
++
++    fun playEpisode(play: (Video) -> Unit) {
++        if (starting) return
++        val episode = previewEpisode ?: return
++        selectedEpisode = episode
++        starting = true
++        scope.launch {
++            try {
++                if (onSaveSettings(EpisodeShuffleSettings(enabled = true, includeWatched = includeWatched))) play(episode)
++            } finally {
++                starting = false
++            }
++        }
++    }
++
++    if (previewEpisode != null) {
++        EpisodeShufflePreview(
++            meta = meta,
++            episode = previewEpisode,
++            includeWatched = includeWatched,
++            isWatched = readyPicker?.isWatched(previewEpisode) == true,
++            isResume = episodeProgress[previewEpisode.season to previewEpisode.episode]?.isInProgress() == true,
++            showManualPlayOption = showManualPlayOption,
++            blurUnwatchedEpisodes = blurUnwatchedEpisodes,
++            canShuffleAgain = (readyPicker?.count(includeWatched) ?: 0) > 1,
++            starting = starting,
++            onBack = { if (!starting) selectedEpisode = null },
++            onPlay = { playEpisode(onPlay) },
++            onPlayManually = { playEpisode(onPlayManually) },
++            onStartFromBeginning = { playEpisode(onStartFromBeginning) },
++            onShuffleAgain = { if (!starting) selectedEpisode = readyPicker?.pick(includeWatched) }
++        )
++        return
++    }
++
++    NuvioDialog(
++        onDismiss = onDismiss,
++        title = stringResource(R.string.random_episode_title),
++        subtitle = stringResource(R.string.shuffle_choose_episodes),
++        width = 420.dp
++    ) {
++        LaunchedEffect(readyPicker != null, focusAll) {
++            if (readyPicker != null) focusRequester.requestFocusAfterFrames()
++        }
++        when {
++            readyPicker == null -> Text(stringResource(R.string.random_episode_loading))
++            allCount == 0 -> {
++                Text(stringResource(R.string.random_episode_empty_subtitle))
++                Button(onClick = onDismiss, modifier = Modifier.focusRequester(focusRequester)) {
++                    Text(stringResource(R.string.action_close))
++                }
++            }
++            else -> {
++                for (include in listOf(false, true)) {
++                    Button(
++                        onClick = {
++                            includeWatched = include
++                            selectedEpisode = readyPicker.pick(include)
++                        },
++                        enabled = include || unwatchedCount > 0,
++                        modifier = Modifier.fillMaxWidth()
++                            .then(if (include == focusAll) Modifier.focusRequester(focusRequester) else Modifier),
++                        colors = ButtonDefaults.colors(
++                            containerColor = NuvioTheme.colors.BackgroundCard,
++                            contentColor = NuvioTheme.colors.TextPrimary
++                        )
++                    ) {
++                        Text(stringResource(if (include) R.string.random_episode_include_watched else R.string.random_episode_unwatched))
++                    }
++                }
++                if (unwatchedCount == 0) Text(stringResource(R.string.random_episode_caught_up))
++            }
++        }
++    }
++}
+diff --git a/app/src/main/java/com/nuvio/tv/ui/screens/detail/EpisodeShufflePreview.kt b/app/src/main/java/com/nuvio/tv/ui/screens/detail/EpisodeShufflePreview.kt
+new file mode 100644
+index 000000000..67b23ba83
+--- /dev/null
++++ b/app/src/main/java/com/nuvio/tv/ui/screens/detail/EpisodeShufflePreview.kt
+@@ -0,0 +1,232 @@
++package com.nuvio.tv.ui.screens.detail
++
++import android.view.KeyEvent as AndroidKeyEvent
++import androidx.compose.foundation.background
++import androidx.compose.foundation.layout.Arrangement
++import androidx.compose.foundation.layout.Box
++import androidx.compose.foundation.layout.Column
++import androidx.compose.foundation.layout.Row
++import androidx.compose.foundation.layout.aspectRatio
++import androidx.compose.foundation.layout.fillMaxSize
++import androidx.compose.foundation.layout.fillMaxWidth
++import androidx.compose.foundation.layout.padding
++import androidx.compose.foundation.layout.size
++import androidx.compose.foundation.shape.RoundedCornerShape
++import androidx.compose.material.icons.Icons
++import androidx.compose.material.icons.automirrored.filled.ArrowBack
++import androidx.compose.material.icons.filled.Shuffle
++import androidx.compose.material.icons.filled.VisibilityOff
++import androidx.compose.runtime.Composable
++import androidx.compose.runtime.LaunchedEffect
++import androidx.compose.runtime.SideEffect
++import androidx.compose.runtime.getValue
++import androidx.compose.runtime.mutableIntStateOf
++import androidx.compose.runtime.mutableStateOf
++import androidx.compose.runtime.remember
++import androidx.compose.runtime.setValue
++import androidx.compose.ui.Alignment
++import androidx.compose.ui.Modifier
++import androidx.compose.ui.draw.clip
++import androidx.compose.ui.focus.FocusRequester
++import androidx.compose.ui.focus.focusProperties
++import androidx.compose.ui.focus.focusRequester
++import androidx.compose.ui.graphics.Brush
++import androidx.compose.ui.graphics.Color
++import androidx.compose.ui.input.key.onPreviewKeyEvent
++import androidx.compose.ui.layout.ContentScale
++import androidx.compose.ui.platform.LocalConfiguration
++import androidx.compose.ui.platform.LocalContext
++import androidx.compose.ui.platform.LocalView
++import androidx.compose.ui.res.stringResource
++import androidx.compose.ui.text.style.TextOverflow
++import androidx.compose.ui.unit.dp
++import androidx.compose.ui.window.Dialog
++import androidx.compose.ui.window.DialogProperties
++import androidx.compose.ui.window.DialogWindowProvider
++import androidx.tv.material3.Button
++import androidx.tv.material3.Icon
++import androidx.tv.material3.MaterialTheme
++import androidx.tv.material3.Text
++import coil3.compose.AsyncImage
++import com.nuvio.tv.R
++import com.nuvio.tv.domain.model.Meta
++import com.nuvio.tv.domain.model.Video
++import com.nuvio.tv.ui.components.PlayManualOverrideDialog
++import com.nuvio.tv.ui.theme.NuvioTheme
++import com.nuvio.tv.ui.util.localizeEpisodeTitle
++
++@Composable
++internal fun EpisodeShufflePreview(
++    meta: Meta,
++    episode: Video,
++    includeWatched: Boolean,
++    isWatched: Boolean,
++    isResume: Boolean,
++    showManualPlayOption: Boolean,
++    blurUnwatchedEpisodes: Boolean,
++    canShuffleAgain: Boolean,
++    starting: Boolean,
++    onBack: () -> Unit,
++    onPlay: () -> Unit,
++    onPlayManually: () -> Unit,
++    onStartFromBeginning: () -> Unit,
++    onShuffleAgain: () -> Unit
++) {
++    val playFocus = remember { FocusRequester() }
++    val backFocus = remember { FocusRequester() }
++    var acceptsSelectKey by remember { mutableStateOf(false) }
++    var showPlayOptions by remember(episode.id) { mutableStateOf(false) }
++    var restorePlayFocusToken by remember { mutableIntStateOf(0) }
++    val compact = LocalConfiguration.current.screenHeightDp < 600
++
++    Dialog(
++        onDismissRequest = { if (!starting) onBack() },
++        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)
++    ) {
++        LaunchedEffect(canShuffleAgain) { playFocus.requestFocusAfterFrames() }
++        val window = (LocalView.current.parent as? DialogWindowProvider)?.window
++        SideEffect {
++            window?.setWindowAnimations(0)
++            window?.setDimAmount(0f)
++        }
++        Column(
++            modifier = Modifier.fillMaxSize()
++                .background(Brush.linearGradient(listOf(Color(0xFF070707), Color(0xFF101010), Color(0xFF151515))))
++                .onPreviewKeyEvent { event ->
++                    if (starting) return@onPreviewKeyEvent true
++                    val native = event.nativeKeyEvent
++                    if (native.keyCode in listOf(AndroidKeyEvent.KEYCODE_DPAD_CENTER,
++                            AndroidKeyEvent.KEYCODE_ENTER, AndroidKeyEvent.KEYCODE_NUMPAD_ENTER)) {
++                        if (native.action == AndroidKeyEvent.ACTION_DOWN && native.repeatCount == 0) {
++                            acceptsSelectKey = true
++                        }
++                        if (!acceptsSelectKey) return@onPreviewKeyEvent true
++                        if (native.action == AndroidKeyEvent.ACTION_UP) acceptsSelectKey = false
++                    }
++                    false
++                }
++                .padding(horizontal = if (compact) 40.dp else 64.dp, vertical = if (compact) 24.dp else 40.dp),
++            verticalArrangement = Arrangement.spacedBy(24.dp)
++        ) {
++            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(24.dp)) {
++                Button(
++                    onClick = { if (!starting) onBack() },
++                    modifier = Modifier.focusRequester(backFocus).focusProperties { down = playFocus }
++                ) {
++                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, modifier = Modifier.size(18.dp))
++                    Text(stringResource(R.string.action_back), modifier = Modifier.padding(start = 8.dp))
++                }
++                Text(meta.name, style = MaterialTheme.typography.titleLarge, color = NuvioTheme.colors.TextPrimary,
++                    maxLines = 1, overflow = TextOverflow.Ellipsis)
++            }
++            Row(
++                modifier = Modifier.weight(1f).fillMaxWidth(),
++                horizontalArrangement = Arrangement.spacedBy(40.dp),
++                verticalAlignment = Alignment.CenterVertically
++            ) {
++                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(14.dp)) {
++                    ShuffleEpisodeArtwork(episode, isWatched, blurUnwatchedEpisodes && !isWatched)
++                    Text(
++                        stringResource(if (includeWatched) R.string.random_episode_include_watched else R.string.random_episode_unwatched),
++                        style = MaterialTheme.typography.bodyMedium, color = NuvioTheme.colors.TextSecondary
++                    )
++                }
++                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(if (compact) 12.dp else 20.dp)) {
++                    Text(stringResource(R.string.shuffle_preview_title), style = MaterialTheme.typography.labelLarge,
++                        color = NuvioTheme.colors.Primary)
++                    Text(stringResource(R.string.season_episode_format, episode.season ?: 0, episode.episode ?: 0),
++                        style = MaterialTheme.typography.titleMedium, color = NuvioTheme.colors.TextSecondary)
++                    Text(episode.title.localizeEpisodeTitle(LocalContext.current),
++                        style = if (compact) MaterialTheme.typography.headlineMedium else MaterialTheme.typography.headlineLarge,
++                        color = NuvioTheme.colors.TextPrimary, maxLines = 2, overflow = TextOverflow.Ellipsis)
++                    episode.overview?.takeIf { it.isNotBlank() }?.let {
++                        Text(it, style = MaterialTheme.typography.bodyMedium, color = NuvioTheme.colors.TextSecondary,
++                            maxLines = if (compact) 3 else 4, overflow = TextOverflow.Ellipsis)
++                    }
++                    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
++                        PlayButton(
++                            text = stringResource(when {
++                                starting -> R.string.shuffle_starting
++                                isResume -> R.string.detail_btn_resume
++                                else -> R.string.shuffle_play_episode
++                            }),
++                            onClick = { if (!starting) onPlay() },
++                            onLongPress = if (!starting && (showManualPlayOption || isResume)) {
++                                { showPlayOptions = true }
++                            } else null,
++                            focusRequester = playFocus,
++                            restoreFocusToken = restorePlayFocusToken,
++                            modifier = Modifier.focusProperties { up = backFocus; down = FocusRequester.Cancel }
++                        )
++                        if (canShuffleAgain) {
++                            Button(
++                                onClick = { if (!starting) onShuffleAgain() },
++                                modifier = Modifier.focusProperties { up = backFocus; down = FocusRequester.Cancel }
++                            ) {
++                                Icon(Icons.Default.Shuffle, contentDescription = null, modifier = Modifier.size(18.dp))
++                                Text(stringResource(R.string.shuffle_again), modifier = Modifier.padding(start = 8.dp))
++                            }
++                        }
++                    }
++                    if (!canShuffleAgain && !starting) {
++                        Text(stringResource(R.string.shuffle_only_episode), style = MaterialTheme.typography.bodySmall,
++                            color = NuvioTheme.colors.TextSecondary)
++                    }
++                }
++            }
++        }
++    }
++    if (showPlayOptions && !starting && (showManualPlayOption || isResume)) {
++        PlayManualOverrideDialog(
++            title = episode.title.localizeEpisodeTitle(LocalContext.current),
++            subtitle = stringResource(R.string.season_episode_format, episode.season ?: 0, episode.episode ?: 0),
++            onDismiss = {
++                showPlayOptions = false
++                restorePlayFocusToken++
++            },
++            showPlayManually = showManualPlayOption,
++            onPlayManually = {
++                showPlayOptions = false
++                restorePlayFocusToken++
++                onPlayManually()
++            },
++            showStartFromBeginning = isResume,
++            onStartFromBeginning = {
++                showPlayOptions = false
++                restorePlayFocusToken++
++                onStartFromBeginning()
++            }
++        )
++    }
++}
++
++@Composable
++private fun ShuffleEpisodeArtwork(episode: Video, isWatched: Boolean, hidden: Boolean) {
++    val context = LocalContext.current
++    val request = remember(context, episode.thumbnail, hidden) {
++        episode.thumbnail?.takeIf { it.isNotBlank() && !hidden }?.let {
++            episodeOverlayBackdropRequest(context, it, 960, 540)
++        }
++    }
++    Box(
++        modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f)
++            .clip(RoundedCornerShape(16.dp)).background(NuvioTheme.colors.BackgroundCard),
++        contentAlignment = Alignment.Center
++    ) {
++        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
++            Icon(if (hidden) Icons.Default.VisibilityOff else Icons.Default.Shuffle, contentDescription = null,
++                tint = NuvioTheme.colors.TextSecondary, modifier = Modifier.size(48.dp))
++            if (hidden) Text(stringResource(R.string.shuffle_artwork_hidden), style = MaterialTheme.typography.bodySmall,
++                color = NuvioTheme.colors.TextSecondary)
++        }
++        if (request != null) AsyncImage(model = request, contentDescription = null, contentScale = ContentScale.Crop,
++            modifier = Modifier.fillMaxSize())
++        Text(
++            stringResource(if (isWatched) R.string.library_filter_watched else R.string.library_watched_filter_unwatched),
++            style = MaterialTheme.typography.labelMedium, color = Color.White,
++            modifier = Modifier.align(Alignment.BottomStart).padding(14.dp)
++                .background(Color.Black.copy(alpha = 0.8f), RoundedCornerShape(6.dp))
++                .padding(horizontal = 10.dp, vertical = 5.dp)
++        )
++    }
++}
+diff --git a/app/src/main/java/com/nuvio/tv/ui/screens/detail/HeroSection.kt b/app/src/main/java/com/nuvio/tv/ui/screens/detail/HeroSection.kt
+index db785eb9c..52ead78fb 100644
+--- a/app/src/main/java/com/nuvio/tv/ui/screens/detail/HeroSection.kt
++++ b/app/src/main/java/com/nuvio/tv/ui/screens/detail/HeroSection.kt
+@@ -100,6 +100,11 @@ fun HeroContentSection(
+     onToggleMovieWatched: () -> Unit,
+     trailerAvailable: Boolean = false,
+     onTrailerClick: () -> Unit = {},
++    showRandomEpisodeButton: Boolean = false,
++    episodeShuffle: com.nuvio.tv.domain.model.EpisodeShuffleSettings = com.nuvio.tv.domain.model.EpisodeShuffleSettings(),
++    shuffleActionPending: Boolean = false,
++    onRandomEpisodeClick: () -> Unit = {},
++    randomEpisodeFocusRequester: FocusRequester? = null,
+     hideLogoDuringTrailer: Boolean = false,
+     mdbListRatings: MDBListRatings? = null,
+     hideMetaInfoImdb: Boolean = false,
+@@ -293,6 +298,16 @@ fun HeroContentSection(
+                                 onFocused = onHeroActionFocused
+                             )
+                         }
++
++                        if (showRandomEpisodeButton) {
++                            ShuffleButton(
++                                active = episodeShuffle.enabled,
++                                pending = shuffleActionPending,
++                                onClick = onRandomEpisodeClick,
++                                focusRequester = randomEpisodeFocusRequester,
++                                onFocused = onHeroActionFocused
++                            )
++                        }
+                     }
+ 
+                     Spacer(modifier = Modifier.height(NuvioTheme.spacing.lg))
+@@ -341,10 +356,11 @@ fun HeroContentSection(
+ 
+ @OptIn(ExperimentalTvMaterial3Api::class, ExperimentalComposeUiApi::class)
+ @Composable
+-private fun PlayButton(
++internal fun PlayButton(
+     text: String?,
+     enabled: Boolean = true,
+     onClick: () -> Unit,
++    modifier: Modifier = Modifier,
+     onLongPress: (() -> Unit)? = null,
+     focusRequester: FocusRequester? = null,
+     restoreFocusToken: Int = 0,
+@@ -373,7 +389,7 @@ private fun PlayButton(
+                 onClick()
+             }
+         },
+-        modifier = Modifier
++        modifier = modifier
+             .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
+             .onFocusChanged {
+                 if (it.isFocused) {
+@@ -382,10 +398,13 @@ private fun PlayButton(
+             }
+             .onPreviewKeyEvent { event ->
+                 val native = event.nativeKeyEvent
++                if (native.action == AndroidKeyEvent.ACTION_DOWN && native.repeatCount == 0 && isSelectKey(native.keyCode)) {
++                    longPressTriggered = false
++                }
+                 if (enabled && onLongPress != null && native.action == AndroidKeyEvent.ACTION_DOWN) {
+                     if (native.keyCode == AndroidKeyEvent.KEYCODE_MENU) {
+                         longPressTriggered = true
+-                        onLongPress()
++                        if (native.repeatCount == 0) onLongPress()
+                         return@onPreviewKeyEvent true
+                     }
+                 }
+@@ -510,7 +529,8 @@ private fun ActionIconButton(
+     selected: Boolean = false,
+     selectedContainerColor: Color = Color(0xFF7CFF9B),
+     selectedContentColor: Color = Color.Black,
+-    onFocused: () -> Unit = {}
++    onFocused: () -> Unit = {},
++    focusRequester: FocusRequester? = null
+ ) {
+     var longPressTriggered by remember { mutableStateOf(false) }
+     val longPressKeyTracker = rememberLongPressKeyTracker()
+@@ -525,16 +545,20 @@ private fun ActionIconButton(
+         },
+         enabled = enabled,
+         modifier = Modifier
++            .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
+             .size(NuvioTheme.spacing.xxxl)
+             .onFocusChanged { state ->
+                 if (state.isFocused) onFocused()
+             }
+             .onPreviewKeyEvent { event ->
+                 val native = event.nativeKeyEvent
++                if (native.action == AndroidKeyEvent.ACTION_DOWN && native.repeatCount == 0 && isSelectKey(native.keyCode)) {
++                    longPressTriggered = false
++                }
+                 if (onLongPress != null && native.action == AndroidKeyEvent.ACTION_DOWN) {
+                     if (native.keyCode == AndroidKeyEvent.KEYCODE_MENU) {
+                         longPressTriggered = true
+-                        onLongPress()
++                        if (native.repeatCount == 0) onLongPress()
+                         return@onPreviewKeyEvent true
+                     }
+                 }
+diff --git a/app/src/main/java/com/nuvio/tv/ui/screens/detail/MetaDetailsScreen.kt b/app/src/main/java/com/nuvio/tv/ui/screens/detail/MetaDetailsScreen.kt
+index 3a0b4ebc0..9ce50389b 100644
+--- a/app/src/main/java/com/nuvio/tv/ui/screens/detail/MetaDetailsScreen.kt
++++ b/app/src/main/java/com/nuvio/tv/ui/screens/detail/MetaDetailsScreen.kt
+@@ -179,35 +179,6 @@ private fun resolveDetailReturnEpisodeFocusTarget(
+     return orderedEpisodes[matchedIndex]
+ }
+ 
+-private fun resolveHeroPlaybackVideo(
+-    meta: Meta,
+-    nextToWatch: NextToWatch?,
+-    episodesForSeason: List<Video>
+-): Video? {
+-    if (meta.type != ContentType.SERIES && meta.videos.isEmpty()) return null
+-
+-    val byId = nextToWatch?.nextVideoId?.let { id ->
+-        meta.videos.firstOrNull { it.id == id }
+-    }
+-    val bySeasonEpisode = if (
+-        byId == null &&
+-        nextToWatch?.nextSeason != null &&
+-        nextToWatch.nextEpisode != null
+-    ) {
+-        meta.videos.firstOrNull {
+-            it.season == nextToWatch.nextSeason && it.episode == nextToWatch.nextEpisode
+-        }
+-    } else {
+-        null
+-    }
+-    val defaultVideoId = meta.behaviorHints?.defaultVideoId
+-    val defaultVideo = meta.videos.firstOrNull {
+-        it.id == defaultVideoId && it.available != false
+-    }
+-
+-    return byId ?: bySeasonEpisode ?: defaultVideo ?: episodesForSeason.firstOrNull()
+-}
+-
+ private const val USER_INTERACTION_DISPATCH_DEBOUNCE_MS = 120L
+ 
+ 
+@@ -640,6 +611,10 @@ fun MetaDetailsScreen(
+                     }
+                     if (!playbackAvailability.isLoaded) return@LaunchedEffect
+                     playOnLoadConsumed.value = true
++                    if (uiState.shufflePoolEmpty) {
++                        playOnLoadReturnObserved.value = true
++                        return@LaunchedEffect
++                    }
+                     if (!playbackAvailability.canStream(meta.apiType, playOnLoadVideo?.id ?: meta.id, meta.id, playOnLoadVideo)) {
+                         playOnLoadReturnObserved.value = true
+                         Toast.makeText(context, R.string.playback_unavailable_message, Toast.LENGTH_SHORT).show()
+@@ -689,6 +664,10 @@ fun MetaDetailsScreen(
+                     watchedEpisodes = uiState.watchedEpisodes,
+                     episodeWatchedPendingKeys = uiState.episodeWatchedPendingKeys,
+                     blurUnwatchedEpisodes = uiState.blurUnwatchedEpisodes,
++                    randomEpisodeEnabled = uiState.randomEpisodeEnabled,
++                    episodeShuffle = uiState.episodeShuffle,
++                    shufflePoolEmpty = uiState.shufflePoolEmpty,
++                    onEpisodeShuffleChange = viewModel::setEpisodeShuffle,
+                     episodeOptionsOverlayStyle = uiState.episodeOptionsOverlayStyle,
+                     showFullReleaseDate = uiState.showFullReleaseDate,
+                     overallRatingsVisibility = uiState.overallRatingsVisibility,
+@@ -1008,6 +987,10 @@ private fun MetaDetailsContent(
+     watchedEpisodes: Set<Pair<Int, Int>>,
+     episodeWatchedPendingKeys: Set<String>,
+     blurUnwatchedEpisodes: Boolean,
++    randomEpisodeEnabled: Boolean,
++    episodeShuffle: com.nuvio.tv.domain.model.EpisodeShuffleSettings,
++    shufflePoolEmpty: Boolean,
++    onEpisodeShuffleChange: suspend (com.nuvio.tv.domain.model.EpisodeShuffleSettings) -> Boolean,
+     episodeOptionsOverlayStyle: EpisodeOptionsOverlayStyle,
+     showFullReleaseDate: Boolean,
+     overallRatingsVisibility: HomeImdbRatingsVisibility,
+@@ -1128,6 +1111,7 @@ private fun MetaDetailsContent(
+     }
+     val selectedSeasonFocusRequester = remember { FocusRequester() }
+     val heroPlayFocusRequester = remember { FocusRequester() }
++    val randomEpisodeFocusRequester = remember { FocusRequester() }
+     val castTabFocusRequester = remember { FocusRequester() }
+     val moreLikeTabFocusRequester = remember { FocusRequester() }
+     val trailerTabFocusRequester = remember { FocusRequester() }
+@@ -1155,6 +1139,17 @@ private fun MetaDetailsContent(
+     var initialHeroFocusRequested by rememberSaveable(meta.id) { mutableStateOf(false) }
+     var showHeroPlayOptionsDialog by rememberSaveable(meta.id) { mutableStateOf(false) }
+     var showSynopsisOverlay by rememberSaveable(meta.id) { mutableStateOf(false) }
++    var showRandomEpisodeOverlay by rememberSaveable(meta.id) { mutableStateOf(false) }
++    var randomEpisodePlaybackPending by rememberSaveable(meta.id) { mutableStateOf(false) }
++    var stoppingShuffle by remember(meta.id) { mutableStateOf(false) }
++    val showRandomEpisodeButton = remember(randomEpisodeEnabled, isSeries, meta.videos, episodeShuffle.enabled) {
++        randomEpisodeEnabled && isSeries && (episodeShuffle.enabled || meta.videos.any {
++            (it.season ?: 0) > 0 && (it.episode ?: 0) > 0
++        })
++    }
++    LaunchedEffect(showRandomEpisodeButton) {
++        if (!showRandomEpisodeButton) showRandomEpisodeOverlay = false
++    }
+     var initialDetailReturnFocusHandled by rememberSaveable(
+         meta.id,
+         detailReturnEpisodeFocusRequest?.season,
+@@ -1262,6 +1257,9 @@ private fun MetaDetailsContent(
+ 
+     DisposableEffect(lifecycleOwner) {
+         val observer = LifecycleEventObserver { _, event ->
++            if (event == Lifecycle.Event.ON_RESUME) {
++                randomEpisodePlaybackPending = false
++            }
+             if (
+                 event == Lifecycle.Event.ON_RESUME &&
+                 restoreOnNextResume &&
+@@ -1790,7 +1788,7 @@ private fun MetaDetailsContent(
+ 
+     // Always-composed bottom gradient alpha (avoids add/remove during scroll)
+ 
+-    Box(modifier = modifier.fillMaxSize()) {
++    Box(modifier = modifier.fillMaxSize().onPreviewKeyEvent { randomEpisodePlaybackPending }) {
+         // Sticky background — backdrop or trailer
+         BackdropLayer(
+             backdropRequest = backdropRequest,
+@@ -1824,9 +1822,9 @@ private fun MetaDetailsContent(
+                         meta = meta,
+                         nextEpisode = nextEpisode,
+                         nextToWatch = nextToWatch,
+-                        onPlayClick = heroPlayClick,
+-                        isPlayEnabled = isPlayEnabled,
+-                        onPlayLongPress = if (isPlayEnabled && (showManualPlayOption || nextToWatch?.isResume == true)) {
++                        onPlayClick = { if (shufflePoolEmpty) showRandomEpisodeOverlay = true else heroPlayClick() },
++                        isPlayEnabled = shufflePoolEmpty || isPlayEnabled,
++                        onPlayLongPress = if (!shufflePoolEmpty && isPlayEnabled && (showManualPlayOption || nextToWatch?.isResume == true)) {
+                             { showHeroPlayOptionsDialog = true }
+                         } else {
+                             null
+@@ -1843,6 +1841,24 @@ private fun MetaDetailsContent(
+                         showFullReleaseDate = showFullReleaseDate,
+                         trailerAvailable = trailerButtonEnabled && !trailerUrl.isNullOrBlank(),
+                         onTrailerClick = onTrailerButtonClick,
++                        showRandomEpisodeButton = showRandomEpisodeButton,
++                        onRandomEpisodeClick = {
++                            if (!episodeShuffle.enabled) {
++                                showRandomEpisodeOverlay = true
++                            } else if (!stoppingShuffle) {
++                                stoppingShuffle = true
++                                coroutineScope.launch {
++                                    try {
++                                        onEpisodeShuffleChange(episodeShuffle.copy(enabled = false))
++                                    } finally {
++                                        stoppingShuffle = false
++                                    }
++                                }
++                            }
++                        },
++                        episodeShuffle = episodeShuffle,
++                        shuffleActionPending = stoppingShuffle,
++                        randomEpisodeFocusRequester = randomEpisodeFocusRequester,
+                         hideLogoDuringTrailer = hideLogoDuringTrailer,
+                         isTrailerPlaying = isTrailerPlaying,
+                         playButtonFocusRequester = heroPlayFocusRequester,
+@@ -2282,6 +2298,47 @@ private fun MetaDetailsContent(
+             )
+         }
+ 
++        if (showRandomEpisodeOverlay && showRandomEpisodeButton) {
++            EpisodeShuffleDialog(
++                meta = meta,
++                shuffleSettings = episodeShuffle,
++                onSaveSettings = onEpisodeShuffleChange,
++                watchedEpisodes = watchedEpisodes,
++                episodeProgress = episodeProgressMap,
++                blurUnwatchedEpisodes = blurUnwatchedEpisodes,
++                showManualPlayOption = showManualPlayOption,
++                onDismiss = {
++                    showRandomEpisodeOverlay = false
++                    coroutineScope.launch { randomEpisodeFocusRequester.requestFocusAfterFrames() }
++                },
++                onPlay = { video ->
++                    if (canPlayEpisode(video)) {
++                        randomEpisodePlaybackPending = true
++                        showRandomEpisodeOverlay = false
++                        video.season?.let(onSeasonSelected)
++                    }
++                    episodeClick(video)
++                },
++                onPlayManually = { video ->
++                    if (canPlayEpisode(video)) {
++                        randomEpisodePlaybackPending = true
++                        showRandomEpisodeOverlay = false
++                        video.season?.let(onSeasonSelected)
++                    }
++                    episodeManualClick(video)
++                },
++                onStartFromBeginning = { video ->
++                    if (canPlayEpisode(video)) {
++                        randomEpisodePlaybackPending = true
++                        showRandomEpisodeOverlay = false
++                        video.season?.let(onSeasonSelected)
++                        markEpisodeRestore(video.id)
++                    }
++                    onEpisodeStartFromBeginningClick(video)
++                }
++            )
++        }
++
+         selectedComment?.let { review ->
+             CommentOverlay(
+                 review = review,
+@@ -2319,6 +2376,9 @@ private fun MetaDetailsContent(
+                 onDismiss = { showSynopsisOverlay = false }
+             )
+         }
++        if (randomEpisodePlaybackPending) {
++            PlaybackHandoffBackdrop(backdropUrl = heroBackdropUrl ?: meta.backdropUrl)
++        }
+     }
+ }
+ 
+diff --git a/app/src/main/java/com/nuvio/tv/ui/screens/detail/MetaDetailsUiState.kt b/app/src/main/java/com/nuvio/tv/ui/screens/detail/MetaDetailsUiState.kt
+index 86e5180af..8a4c63109 100644
+--- a/app/src/main/java/com/nuvio/tv/ui/screens/detail/MetaDetailsUiState.kt
++++ b/app/src/main/java/com/nuvio/tv/ui/screens/detail/MetaDetailsUiState.kt
+@@ -62,6 +62,9 @@ data class MetaDetailsUiState(
+     val watchedEpisodes: Set<Pair<Int, Int>> = emptySet(),
+     val episodeWatchedPendingKeys: Set<String> = emptySet(),
+     val blurUnwatchedEpisodes: Boolean = false,
++    val randomEpisodeEnabled: Boolean = false,
++    val episodeShuffle: com.nuvio.tv.domain.model.EpisodeShuffleSettings = com.nuvio.tv.domain.model.EpisodeShuffleSettings(),
++    val shufflePoolEmpty: Boolean = false,
+     val episodeOptionsOverlayStyle: EpisodeOptionsOverlayStyle = EpisodeOptionsOverlayStyle.BLUR,
+     val overallRatingsVisibility: HomeImdbRatingsVisibility = HomeImdbRatingsVisibility.SHOW_ALL,
+     val detailImdbRatingsVisibility: DetailImdbRatingsVisibility = DetailImdbRatingsVisibility.SHOW_ALL,
+diff --git a/app/src/main/java/com/nuvio/tv/ui/screens/detail/MetaDetailsViewModel.kt b/app/src/main/java/com/nuvio/tv/ui/screens/detail/MetaDetailsViewModel.kt
+index 604869ad8..0a39ed2a5 100644
+--- a/app/src/main/java/com/nuvio/tv/ui/screens/detail/MetaDetailsViewModel.kt
++++ b/app/src/main/java/com/nuvio/tv/ui/screens/detail/MetaDetailsViewModel.kt
+@@ -54,6 +54,8 @@ import kotlinx.coroutines.coroutineScope
+ import kotlinx.coroutines.delay
+ import kotlinx.coroutines.flow.MutableStateFlow
+ import kotlinx.coroutines.flow.StateFlow
++import kotlinx.coroutines.flow.SharingStarted
++import kotlinx.coroutines.flow.stateIn
+ import kotlinx.coroutines.flow.asStateFlow
+ import kotlinx.coroutines.flow.collectLatest
+ import kotlinx.coroutines.flow.combine
+@@ -93,6 +95,8 @@ class MetaDetailsViewModel @Inject constructor(
+     private val traktRelatedService: TraktRelatedService,
+     private val traktSettingsDataStore: TraktSettingsDataStore,
+     private val layoutPreferenceDataStore: LayoutPreferenceDataStore,
++    private val episodeShuffleStore: com.nuvio.tv.data.local.EpisodeShuffleStore,
++    private val episodeShuffle: com.nuvio.tv.domain.model.EpisodeShuffle,
+     private val playerSettingsDataStore: PlayerSettingsDataStore,
+     private val profileManager: ProfileManager,
+     private val metaDetailsSessionState: MetaDetailsSessionState,
+@@ -105,7 +109,12 @@ class MetaDetailsViewModel @Inject constructor(
+     private val preferredAddonBaseUrl: String? = savedStateHandle["addonBaseUrl"]
+ 
+     private val _uiState = MutableStateFlow(MetaDetailsUiState())
+-    val uiState: StateFlow<MetaDetailsUiState> = _uiState.asStateFlow()
++    private val shuffleVisit = System.nanoTime()
++    val uiState: StateFlow<MetaDetailsUiState> = combine(
++        _uiState, episodeShuffleStore.profiles, watchProgressRepository.continueWatching
++    ) { state, profile, progress ->
++        applyDetailShuffle(state, profile, progress, episodeShuffle, shuffleVisit, localizedContext)
++    }.stateIn(viewModelScope, SharingStarted.Eagerly, MetaDetailsUiState())
+ 
+     private val _posterCardCornerRadiusDp = MutableStateFlow(12)
+     val posterCardCornerRadiusDp: StateFlow<Int> = _posterCardCornerRadiusDp.asStateFlow()
+@@ -614,6 +623,30 @@ class MetaDetailsViewModel @Inject constructor(
+         }
+     }
+ 
++    suspend fun setEpisodeShuffle(settings: com.nuvio.tv.domain.model.EpisodeShuffleSettings): Boolean {
++        val meta = uiState.value.meta ?: return false
++        val profileId = profileManager.activeProfileId.value
++        val previous = uiState.value.episodeShuffle
++        return try {
++            episodeShuffleStore.save(meta.id, settings, profileId)
++            if (profileManager.activeProfileId.value != profileId) return false
++            if (previous.enabled != settings.enabled || (settings.enabled && previous.includeWatched != settings.includeWatched)) {
++                val message = when {
++                    !settings.enabled -> R.string.shuffle_disabled
++                    settings.includeWatched -> R.string.shuffle_enabled_all
++                    else -> R.string.shuffle_enabled_unwatched
++                }
++                showMessage(localizedContext.getString(message))
++            }
++            true
++        } catch (error: CancellationException) {
++            throw error
++        } catch (_: Exception) {
++            showMessage(localizedContext.getString(R.string.shuffle_save_failed), isError = true)
++            false
++        }
++    }
++
+     private fun observeDetailImdbRatingsVisibility() {
+         viewModelScope.launch {
+             layoutPreferenceDataStore.detailImdbRatingsVisibility
+diff --git a/app/src/main/java/com/nuvio/tv/ui/screens/detail/ShuffleButton.kt b/app/src/main/java/com/nuvio/tv/ui/screens/detail/ShuffleButton.kt
+new file mode 100644
+index 000000000..f3c9e2700
+--- /dev/null
++++ b/app/src/main/java/com/nuvio/tv/ui/screens/detail/ShuffleButton.kt
+@@ -0,0 +1,43 @@
++package com.nuvio.tv.ui.screens.detail
++
++import androidx.compose.foundation.layout.Arrangement
++import androidx.compose.foundation.layout.Row
++import androidx.compose.foundation.layout.size
++import androidx.compose.material.icons.Icons
++import androidx.compose.material.icons.filled.Shuffle
++import androidx.compose.material.icons.filled.Stop
++import androidx.compose.runtime.Composable
++import androidx.compose.ui.Alignment
++import androidx.compose.ui.Modifier
++import androidx.compose.ui.focus.FocusRequester
++import androidx.compose.ui.focus.focusProperties
++import androidx.compose.ui.focus.focusRequester
++import androidx.compose.ui.focus.onFocusChanged
++import androidx.compose.ui.res.stringResource
++import androidx.compose.ui.unit.dp
++import androidx.tv.material3.Button
++import androidx.tv.material3.Icon
++import androidx.tv.material3.Text
++import com.nuvio.tv.R
++
++@Composable
++internal fun ShuffleButton(
++    active: Boolean,
++    pending: Boolean,
++    onClick: () -> Unit,
++    focusRequester: FocusRequester?,
++    onFocused: () -> Unit
++) {
++    Button(
++        onClick = { if (!pending) onClick() },
++        modifier = Modifier
++            .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
++            .focusProperties { up = FocusRequester.Cancel }
++            .onFocusChanged { if (it.isFocused) onFocused() }
++    ) {
++        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
++            Icon(if (active) Icons.Default.Stop else Icons.Default.Shuffle, null, Modifier.size(18.dp))
++            Text(stringResource(if (active) R.string.shuffle_stop else R.string.random_episode_title))
++        }
++    }
++}
+diff --git a/app/src/main/java/com/nuvio/tv/ui/screens/home/HomeEpisodeShuffle.kt b/app/src/main/java/com/nuvio/tv/ui/screens/home/HomeEpisodeShuffle.kt
+new file mode 100644
+index 000000000..693f8afe5
+--- /dev/null
++++ b/app/src/main/java/com/nuvio/tv/ui/screens/home/HomeEpisodeShuffle.kt
+@@ -0,0 +1,83 @@
++package com.nuvio.tv.ui.screens.home
++
++import androidx.lifecycle.viewModelScope
++import com.nuvio.tv.data.local.EpisodeShuffleProfile
++import com.nuvio.tv.domain.model.ContinueWatchingSortMode
++import com.nuvio.tv.domain.model.EpisodeShuffle
++import com.nuvio.tv.domain.model.ShuffleSurface
++import com.nuvio.tv.domain.model.Video
++import kotlinx.coroutines.flow.SharingStarted
++import kotlinx.coroutines.flow.combine
++import kotlinx.coroutines.flow.distinctUntilChanged
++import kotlinx.coroutines.flow.stateIn
++
++internal data class HomeShuffleRefresh(val visit: Long = System.nanoTime(), val metadata: Int = 0)
++
++internal fun HomeViewModel.createShuffleHomeState() = combine(
++    _uiState,
++    episodeShuffleStore.profiles,
++    combine(watchProgressRepository.watchedItems, watchProgressRepository.allProgress) { watched, progress ->
++        val keys = watched.mapNotNull { item ->
++            item.season?.let { season -> item.episode?.let { item.contentId to (season to it) } }
++        } + progress.filter { it.isCompleted() }.mapNotNull { item ->
++            item.season?.let { season -> item.episode?.let { item.contentId to (season to it) } }
++        }
++        keys.groupBy({ it.first }, { it.second }).mapValues { it.value.toSet() }
++    }.distinctUntilChanged(),
++    shuffleHomeRefresh
++) { state, profile, watched, refresh ->
++    applyHomeShuffle(state, profile, watched, episodeShuffle, refresh.visit, continueWatchingSortMode) { id, type ->
++        val cached = cwMetaCache["$type:$id"] ?: cwMetaCache["series:$id"] ?: cwMetaCache["tv:$id"]
++        cached?.videos?.map { video ->
++            Video(video.id, video.title.orEmpty(), video.released, video.thumbnail,
++                season = video.season, episode = video.episode, overview = video.overview, available = video.available)
++        }
++    }
++}.stateIn(viewModelScope, SharingStarted.Eagerly, HomeUiState())
++
++internal fun applyHomeShuffle(
++    state: HomeUiState,
++    profile: EpisodeShuffleProfile,
++    watched: Map<String, Set<Pair<Int, Int>>>,
++    shuffle: EpisodeShuffle,
++    visit: Long,
++    sortMode: ContinueWatchingSortMode,
++    videos: (String, String) -> List<Video>?
++): HomeUiState {
++    if (!profile.available || profile.shows.values.none { it.enabled }) return state
++    val items = state.continueWatchingItems + state.upcomingItems
++    val resumable = items.filterIsInstance<ContinueWatchingItem.InProgress>()
++        .filter { profile.settings(it.progress.contentId, it.progress.contentType).enabled }
++        .groupBy { it.progress.contentId }
++        .mapValues { (_, episodes) -> episodes.maxBy { it.progress.lastWatched } }
++    val projected = items.mapNotNull { item ->
++        when (item) {
++            is ContinueWatchingItem.InProgress -> {
++                val latest = resumable[item.progress.contentId]
++                if (latest != null && latest != item) null else item.copy(shufflePlayback = latest != null)
++            }
++            is ContinueWatchingItem.NextUp -> {
++                val info = item.info
++                if (info.contentId in resumable) return@mapNotNull null
++                val settings = profile.settings(info.contentId, info.contentType)
++                if (!settings.enabled) item else {
++                    val catalogue = videos(info.contentId, info.contentType) ?: return@mapNotNull null
++                    val selected = shuffle.select(
++                        profile.profileId, info.contentId, catalogue, settings.includeWatched,
++                        watched[info.contentId].orEmpty(), surface = ShuffleSurface.HOME, visit = visit
++                    ) ?: return@mapNotNull null
++                    item.copy(shufflePlayback = true, info = info.copy(
++                        videoId = selected.id, season = selected.season!!, episode = selected.episode!!,
++                        episodeTitle = selected.title, episodeDescription = selected.overview,
++                        thumbnail = selected.thumbnail, released = selected.released,
++                        hasAired = true, airDateLabel = null, releaseTimestamp = null,
++                        isReleaseAlert = false, isNewSeasonRelease = false
++                    ))
++                }
++            }
++        }
++    }
++    val unique = projected.distinctBy { it.shuffleFocusKey ?: continueWatchingItemKey(it) }
++    val (current, upcoming) = splitUpcomingItems(unique, sortMode)
++    return state.copy(continueWatchingItems = current, upcomingItems = upcoming)
++}
+diff --git a/app/src/main/java/com/nuvio/tv/ui/screens/home/HomeScreen.kt b/app/src/main/java/com/nuvio/tv/ui/screens/home/HomeScreen.kt
+index d9e19cae8..3e6c8d145 100644
+--- a/app/src/main/java/com/nuvio/tv/ui/screens/home/HomeScreen.kt
++++ b/app/src/main/java/com/nuvio/tv/ui/screens/home/HomeScreen.kt
+@@ -105,6 +105,7 @@ fun HomeScreen(
+     DisposableEffect(lifecycleOwner) {
+         val observer = LifecycleEventObserver { _, event ->
+             if (event == Lifecycle.Event.ON_RESUME) {
++                viewModel.beginShuffleHomeVisit()
+                 viewModel.refreshHomeCatalogsIfStale()
+             }
+         }
+diff --git a/app/src/main/java/com/nuvio/tv/ui/screens/home/HomeUiState.kt b/app/src/main/java/com/nuvio/tv/ui/screens/home/HomeUiState.kt
+index c9405f8af..32cacbbfd 100644
+--- a/app/src/main/java/com/nuvio/tv/ui/screens/home/HomeUiState.kt
++++ b/app/src/main/java/com/nuvio/tv/ui/screens/home/HomeUiState.kt
+@@ -72,6 +72,7 @@ data class HomeUiState(
+ 
+ @Immutable
+ sealed class ContinueWatchingItem {
++    abstract val shufflePlayback: Boolean
+     @Immutable
+     data class InProgress(
+         val progress: WatchProgress,
+@@ -80,13 +81,20 @@ sealed class ContinueWatchingItem {
+         val episodeImdbRating: Float? = null,
+         val genres: List<String> = emptyList(),
+         val releaseInfo: String? = null,
+-        val contentLanguage: String? = null
++        val contentLanguage: String? = null,
++        override val shufflePlayback: Boolean = false
+     ) : ContinueWatchingItem()
+ 
+     @Immutable
+-    data class NextUp(val info: NextUpInfo) : ContinueWatchingItem()
++    data class NextUp(val info: NextUpInfo, override val shufflePlayback: Boolean = false) : ContinueWatchingItem()
+ }
+ 
++val ContinueWatchingItem.shuffleFocusKey: String?
++    get() = if (!shufflePlayback) null else when (this) {
++        is ContinueWatchingItem.InProgress -> "cw_shuffle_${progress.contentId}"
++        is ContinueWatchingItem.NextUp -> "cw_shuffle_${info.contentId}"
++    }
++
+ @Immutable
+ data class NextUpInfo(
+     val contentId: String,
+diff --git a/app/src/main/java/com/nuvio/tv/ui/screens/home/HomeViewModel.kt b/app/src/main/java/com/nuvio/tv/ui/screens/home/HomeViewModel.kt
+index 6cf7350bd..0ee17c081 100644
+--- a/app/src/main/java/com/nuvio/tv/ui/screens/home/HomeViewModel.kt
++++ b/app/src/main/java/com/nuvio/tv/ui/screens/home/HomeViewModel.kt
+@@ -67,6 +67,8 @@ class HomeViewModel @Inject constructor(
+     internal val watchProgressRepository: WatchProgressRepository,
+     internal val libraryRepository: LibraryRepository,
+     internal val metaRepository: MetaRepository,
++    internal val episodeShuffleStore: com.nuvio.tv.data.local.EpisodeShuffleStore,
++    internal val episodeShuffle: com.nuvio.tv.domain.model.EpisodeShuffle,
+     internal val collectionsDataStore: CollectionsDataStore,
+     internal val layoutPreferenceDataStore: LayoutPreferenceDataStore,
+     internal val playerSettingsDataStore: PlayerSettingsDataStore,
+@@ -111,7 +113,12 @@ class HomeViewModel @Inject constructor(
+     }
+ 
+     internal val _uiState = MutableStateFlow(HomeUiState())
+-    val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
++    internal val shuffleHomeRefresh = MutableStateFlow(HomeShuffleRefresh())
++    val uiState: StateFlow<HomeUiState> by lazy { createShuffleHomeState() }
++
++    fun beginShuffleHomeVisit() {
++        shuffleHomeRefresh.update { it.copy(visit = it.visit + 1) }
++    }
+ 
+     internal val _modernHomePresentation = MutableStateFlow(ModernHomePresentationState())
+     val modernHomePresentation: StateFlow<ModernHomePresentationState> = _modernHomePresentation.asStateFlow()
+diff --git a/app/src/main/java/com/nuvio/tv/ui/screens/home/HomeViewModelContinueWatching.kt b/app/src/main/java/com/nuvio/tv/ui/screens/home/HomeViewModelContinueWatching.kt
+index 778b1f5af..58e4d5230 100644
+--- a/app/src/main/java/com/nuvio/tv/ui/screens/home/HomeViewModelContinueWatching.kt
++++ b/app/src/main/java/com/nuvio/tv/ui/screens/home/HomeViewModelContinueWatching.kt
+@@ -2444,6 +2444,7 @@ private suspend fun HomeViewModel.resolveMetaForProgress(
+             cwMetaNegativeCacheTimestamps.remove(cacheKey)
+         }
+     }
++    shuffleHomeRefresh.update { it.copy(metadata = it.metadata + 1) }
+     return resolved
+ }
+ 
+diff --git a/app/src/main/java/com/nuvio/tv/ui/screens/home/ModernHomeModels.kt b/app/src/main/java/com/nuvio/tv/ui/screens/home/ModernHomeModels.kt
+index d5083531b..225fbdafe 100644
+--- a/app/src/main/java/com/nuvio/tv/ui/screens/home/ModernHomeModels.kt
++++ b/app/src/main/java/com/nuvio/tv/ui/screens/home/ModernHomeModels.kt
+@@ -576,7 +576,7 @@ internal fun buildCollectionFolderItem(
+ }
+ 
+ internal fun continueWatchingItemKey(item: ContinueWatchingItem): String {
+-    return when (item) {
++    return item.shuffleFocusKey ?: when (item) {
+         is ContinueWatchingItem.InProgress ->
+             "cw_inprogress_${item.progress.contentId}_${item.progress.season ?: -1}_${item.progress.episode ?: -1}"
+         is ContinueWatchingItem.NextUp ->
+diff --git a/app/src/main/java/com/nuvio/tv/ui/screens/player/PlayerRuntimeController.kt b/app/src/main/java/com/nuvio/tv/ui/screens/player/PlayerRuntimeController.kt
+index 5825e165f..9cfd2b25d 100644
+--- a/app/src/main/java/com/nuvio/tv/ui/screens/player/PlayerRuntimeController.kt
++++ b/app/src/main/java/com/nuvio/tv/ui/screens/player/PlayerRuntimeController.kt
+@@ -82,6 +82,7 @@ class PlayerRuntimeController(
+     internal val streamBadgeSettingsDataStore: StreamBadgeSettingsDataStore,
+     internal val bingeGroupCacheDataStore: BingeGroupCacheDataStore,
+     internal val layoutPreferenceDataStore: com.nuvio.tv.data.local.LayoutPreferenceDataStore,
++    internal val episodeShufflePlayback: com.nuvio.tv.core.player.EpisodeShufflePlayback,
+     internal val watchedItemsPreferences: com.nuvio.tv.data.local.WatchedItemsPreferences,
+     internal val trackPreferenceDataStore: com.nuvio.tv.data.local.TrackPreferenceDataStore,
+     internal val audioDelayRouteDataStore: AudioDelayRouteDataStore,
+@@ -418,6 +419,7 @@ class PlayerRuntimeController(
+     /** Back buffer (ms) the user configured, captured at build to restore once DV7 status is known. */
+     internal var configuredBackBufferMs: Int = 0
+     internal var metaVideos: List<Video> = emptyList()
++    internal var playbackShuffleState: com.nuvio.tv.core.player.PlaybackShuffleState? = null
+     internal var cloudPlaybackContext: CloudLibraryPlaybackContext? =
+         cloudPlaybackSessionStore.load(cloudSessionToken)
+     internal var metaGenres: List<String> = emptyList()
+diff --git a/app/src/main/java/com/nuvio/tv/ui/screens/player/PlayerRuntimeControllerMetadata.kt b/app/src/main/java/com/nuvio/tv/ui/screens/player/PlayerRuntimeControllerMetadata.kt
+index bdc915706..71ba26d78 100644
+--- a/app/src/main/java/com/nuvio/tv/ui/screens/player/PlayerRuntimeControllerMetadata.kt
++++ b/app/src/main/java/com/nuvio/tv/ui/screens/player/PlayerRuntimeControllerMetadata.kt
+@@ -256,10 +256,12 @@ internal fun PlayerRuntimeController.recomputeNextEpisode(resetVisibility: Boole
+         return
+     }
+ 
+-    val resolvedNext = PlayerNextEpisodeRules.resolveNextEpisode(
+-        videos = metaVideos,
+-        currentSeason = season,
+-        currentEpisode = episode
++    val shuffleState = playbackShuffleState ?: run {
++        clearNextEpisodeAndCancelPostPlay()
++        return
++    }
++    val resolvedNext = episodeShufflePlayback.nextEpisode(
++        profileId, contentId.orEmpty(), metaVideos, season, episode, shuffleState
+     )
+ 
+     nextEpisodeVideo = resolvedNext
+diff --git a/app/src/main/java/com/nuvio/tv/ui/screens/player/PlayerRuntimeControllerObservers.kt b/app/src/main/java/com/nuvio/tv/ui/screens/player/PlayerRuntimeControllerObservers.kt
+index 2b7194daf..300cc7be6 100644
+--- a/app/src/main/java/com/nuvio/tv/ui/screens/player/PlayerRuntimeControllerObservers.kt
++++ b/app/src/main/java/com/nuvio/tv/ui/screens/player/PlayerRuntimeControllerObservers.kt
+@@ -277,16 +277,12 @@ internal fun PlayerRuntimeController.observeBlurUnwatchedEpisodes() {
+ internal fun PlayerRuntimeController.observeEpisodeWatchProgress() {
+     val id = contentId ?: return
+     val type = contentType ?: return
+-    if (type.lowercase() != "series") return
+-    val baseId = id.split(":").firstOrNull() ?: id
++    if (!type.equals("series", true) && !type.equals("tv", true)) return
+     scope.launch {
+-        watchProgressRepository.getAllEpisodeProgress(baseId, profileId).collectLatest { progressMap ->
+-            _uiState.update { it.copy(episodeWatchProgressMap = progressMap) }
+-        }
+-    }
+-    scope.launch {
+-        watchedItemsPreferences.getWatchedEpisodesForContent(baseId, profileId).collectLatest { watchedSet ->
+-            _uiState.update { it.copy(watchedEpisodeKeys = watchedSet) }
++        episodeShufflePlayback.observe(profileId, id, type).collectLatest { state ->
++            playbackShuffleState = state
++            _uiState.update { it.copy(episodeWatchProgressMap = state.progress, watchedEpisodeKeys = state.watched) }
++            recomputeNextEpisode(resetVisibility = false)
+         }
+     }
+ }
+diff --git a/app/src/main/java/com/nuvio/tv/ui/screens/player/PlayerViewModel.kt b/app/src/main/java/com/nuvio/tv/ui/screens/player/PlayerViewModel.kt
+index 9faf1e03b..3f75e2fd8 100644
+--- a/app/src/main/java/com/nuvio/tv/ui/screens/player/PlayerViewModel.kt
++++ b/app/src/main/java/com/nuvio/tv/ui/screens/player/PlayerViewModel.kt
+@@ -66,6 +66,7 @@ class PlayerViewModel @Inject constructor(
+     private val streamBadgeSettingsDataStore: StreamBadgeSettingsDataStore,
+     private val bingeGroupCacheDataStore: com.nuvio.tv.data.local.BingeGroupCacheDataStore,
+     private val layoutPreferenceDataStore: com.nuvio.tv.data.local.LayoutPreferenceDataStore,
++    private val episodeShufflePlayback: com.nuvio.tv.core.player.EpisodeShufflePlayback,
+     private val watchedItemsPreferences: com.nuvio.tv.data.local.WatchedItemsPreferences,
+     private val watchedSeriesStateHolder: WatchedSeriesStateHolder,
+     private val trackPreferenceDataStore: com.nuvio.tv.data.local.TrackPreferenceDataStore,
+@@ -122,6 +123,7 @@ class PlayerViewModel @Inject constructor(
+         bingeGroupCacheDataStore = bingeGroupCacheDataStore,
+         layoutPreferenceDataStore = layoutPreferenceDataStore,
+         watchedItemsPreferences = watchedItemsPreferences,
++        episodeShufflePlayback = episodeShufflePlayback,
+         trackPreferenceDataStore = trackPreferenceDataStore,
+         audioDelayRouteDataStore = audioDelayRouteDataStore,
+         torrentService = torrentService,
+@@ -321,16 +323,6 @@ class PlayerViewModel @Inject constructor(
+             profileId = controller.profileId
+         )
+         val headers = controller.getCurrentHeaders()
+-        val nextEpisodeSnapshot = controller.metaVideos
+-            .takeIf { it.isNotEmpty() }
+-            ?.let { videos ->
+-                com.nuvio.tv.core.player.resolveExternalNextEpisodeSnapshot(
+-                    videos = videos,
+-                    currentSeason = metadata.season,
+-                    currentEpisode = metadata.episode
+-                )
+-            }
+-
+         // Capture already-loaded addon subtitles before handing off. Preparation stays in the
+         // ViewModel scope because the player screen remains alive until the intent is sent.
+         val subtitleInputs = if (controller.uiState.value.subtitleStyle.preferredLanguage.trim().lowercase() != "none") {
+@@ -360,6 +352,9 @@ class PlayerViewModel @Inject constructor(
+ 
+             // Stop the internal player only after preparation has completed and immediately
+             // before sending the external intent.
++            val nextEpisodeSnapshot = controller.metaVideos.takeIf { it.isNotEmpty() }?.let {
++                externalPlaybackTracker.resolveNextEpisodeSnapshot(metadata, it)
++            }
+             controller.stopAndRelease()
+             val launched = try {
+                 externalPlaybackTracker.launchPlayer(
+diff --git a/app/src/main/java/com/nuvio/tv/ui/screens/settings/LayoutSettingsScreen.kt b/app/src/main/java/com/nuvio/tv/ui/screens/settings/LayoutSettingsScreen.kt
+index 960653baa..9446bf6ea 100644
+--- a/app/src/main/java/com/nuvio/tv/ui/screens/settings/LayoutSettingsScreen.kt
++++ b/app/src/main/java/com/nuvio/tv/ui/screens/settings/LayoutSettingsScreen.kt
+@@ -524,6 +524,18 @@ fun LayoutSettingsContent(
+                         onFocused = { focusedSection = LayoutSettingsSection.DETAIL_PAGE }
+                     )
+ 
++                    CompactToggleRow(
++                        title = stringResource(R.string.random_episode_title),
++                        subtitle = stringResource(R.string.layout_random_episode_sub),
++                        checked = uiState.randomEpisodeEnabled,
++                        onToggle = {
++                            viewModel.onEvent(
++                                LayoutSettingsEvent.SetRandomEpisodeEnabled(!uiState.randomEpisodeEnabled)
++                            )
++                        },
++                        onFocused = { focusedSection = LayoutSettingsSection.DETAIL_PAGE }
++                    )
++
+                     CompactToggleRow(
+                         title = stringResource(R.string.layout_blur_unwatched),
+                         subtitle = stringResource(R.string.layout_blur_unwatched_sub),
+diff --git a/app/src/main/java/com/nuvio/tv/ui/screens/settings/LayoutSettingsViewModel.kt b/app/src/main/java/com/nuvio/tv/ui/screens/settings/LayoutSettingsViewModel.kt
+index 7aa21663b..db1455479 100644
+--- a/app/src/main/java/com/nuvio/tv/ui/screens/settings/LayoutSettingsViewModel.kt
++++ b/app/src/main/java/com/nuvio/tv/ui/screens/settings/LayoutSettingsViewModel.kt
+@@ -66,6 +66,7 @@ data class LayoutSettingsUiState(
+     val posterCardCornerRadiusDp: Int = 12,
+     val cardDepthStyle: CardDepthStyle = CardDepthStyle(),
+     val blurUnwatchedEpisodes: Boolean = false,
++    val randomEpisodeEnabled: Boolean = false,
+     val episodeOptionsOverlayStyle: EpisodeOptionsOverlayStyle = EpisodeOptionsOverlayStyle.BLUR,
+     val homeImdbRatingsVisibility: HomeImdbRatingsVisibility = HomeImdbRatingsVisibility.SHOW_ALL,
+     val detailImdbRatingsVisibility: DetailImdbRatingsVisibility = DetailImdbRatingsVisibility.SHOW_ALL,
+@@ -122,6 +123,7 @@ sealed class LayoutSettingsEvent {
+         val enabled: Boolean
+     ) : LayoutSettingsEvent()
+     data class SetBlurUnwatchedEpisodes(val enabled: Boolean) : LayoutSettingsEvent()
++    data class SetRandomEpisodeEnabled(val enabled: Boolean) : LayoutSettingsEvent()
+     data class SetEpisodeOptionsOverlayStyle(val style: EpisodeOptionsOverlayStyle) : LayoutSettingsEvent()
+     data class SetHomeImdbRatingsVisibility(val visibility: HomeImdbRatingsVisibility) : LayoutSettingsEvent()
+     data class SetDetailImdbRatingsVisibility(val visibility: DetailImdbRatingsVisibility) : LayoutSettingsEvent()
+@@ -302,6 +304,11 @@ class LayoutSettingsViewModel @Inject constructor(
+                 updateUiStateIfChanged { it.copy(blurUnwatchedEpisodes = enabled) }
+             }
+         }
++        viewModelScope.launch {
++            layoutPreferenceDataStore.randomEpisodeEnabled.distinctUntilChanged().collectLatest { enabled ->
++                updateUiStateIfChanged { it.copy(randomEpisodeEnabled = enabled) }
++            }
++        }
+         viewModelScope.launch {
+             layoutPreferenceDataStore.episodeOptionsOverlayStyle.distinctUntilChanged().collectLatest { style ->
+                 updateUiStateIfChanged { it.copy(episodeOptionsOverlayStyle = style) }
+@@ -421,6 +428,7 @@ class LayoutSettingsViewModel @Inject constructor(
+             is LayoutSettingsEvent.SetCardDepthSurfaceEnabled ->
+                 setCardDepthSurfaceEnabled(event.surface, event.enabled)
+             is LayoutSettingsEvent.SetBlurUnwatchedEpisodes -> setBlurUnwatchedEpisodes(event.enabled)
++            is LayoutSettingsEvent.SetRandomEpisodeEnabled -> setRandomEpisodeEnabled(event.enabled)
+             is LayoutSettingsEvent.SetEpisodeOptionsOverlayStyle -> setEpisodeOptionsOverlayStyle(event.style)
+             is LayoutSettingsEvent.SetHomeImdbRatingsVisibility -> setHomeImdbRatingsVisibility(event.visibility)
+             is LayoutSettingsEvent.SetDetailImdbRatingsVisibility -> setDetailImdbRatingsVisibility(event.visibility)
+@@ -726,6 +734,13 @@ class LayoutSettingsViewModel @Inject constructor(
+         }
+     }
+ 
++    private fun setRandomEpisodeEnabled(enabled: Boolean) {
++        if (_uiState.value.randomEpisodeEnabled == enabled) return
++        viewModelScope.launch {
++            layoutPreferenceDataStore.setRandomEpisodeEnabled(enabled)
++        }
++    }
++
+     private fun setHomeImdbRatingsVisibility(visibility: HomeImdbRatingsVisibility) {
+         if (_uiState.value.homeImdbRatingsVisibility == visibility) return
+         viewModelScope.launch {
+diff --git a/app/src/main/java/com/nuvio/tv/ui/screens/stream/StreamScreenViewModel.kt b/app/src/main/java/com/nuvio/tv/ui/screens/stream/StreamScreenViewModel.kt
+index c048fffc0..f1ebaf2eb 100644
+--- a/app/src/main/java/com/nuvio/tv/ui/screens/stream/StreamScreenViewModel.kt
++++ b/app/src/main/java/com/nuvio/tv/ui/screens/stream/StreamScreenViewModel.kt
+@@ -1638,11 +1638,7 @@ class StreamScreenViewModel @Inject constructor(
+             subtitles = subtitleInputs,
+             autoLaunch = autoLaunch,
+             nextEpisodeSnapshot = playbackMetaVideos?.let { videos ->
+-                com.nuvio.tv.core.player.resolveExternalNextEpisodeSnapshot(
+-                    videos = videos,
+-                    currentSeason = metadata.season,
+-                    currentEpisode = metadata.episode
+-                )
++                externalPlaybackTracker.resolveNextEpisodeSnapshot(metadata, videos)
+             },
+             context = context
+         )
+diff --git a/app/src/main/res/values/strings.xml b/app/src/main/res/values/strings.xml
+index 040602315..5bc768504 100644
+--- a/app/src/main/res/values/strings.xml
++++ b/app/src/main/res/values/strings.xml
+@@ -3201,4 +3201,25 @@
+     <string name="stream_test_video_bitrate">Average Video Bitrate: %1$s</string>
+     <string name="stream_test_error_connection">Connection failed. The last played stream link may have expired or is unreachable. Please play the video again and retry.</string>
+ 
++    <string name="random_episode_title">Shuffle</string>
++    <string name="layout_random_episode_sub">Shuffle episodes from any series. Turning this off pauses shuffle.</string>
++    <string name="random_episode_unwatched">Unwatched episodes</string>
++    <string name="random_episode_include_watched">All episodes</string>
++    <string name="random_episode_empty_subtitle">No episodes are available to shuffle.</string>
++    <string name="random_episode_caught_up">You have watched every episode. Choose All episodes to watch again.</string>
++    <string name="random_episode_loading">Loading episodes…</string>
++    <string name="shuffle_starting">Starting shuffle…</string>
++    <string name="shuffle_choose_episodes">Choose which episodes to shuffle.</string>
++    <string name="shuffle_preview_title">Your episode</string>
++    <string name="shuffle_play_episode">Play episode</string>
++    <string name="shuffle_again">Shuffle again</string>
++    <string name="shuffle_only_episode">This is the only episode in your selection.</string>
++    <string name="shuffle_artwork_hidden">Artwork hidden to avoid spoilers</string>
++    <string name="shuffle_stop">Stop shuffle</string>
++    <string name="shuffle_enabled_all">Shuffle on · All episodes</string>
++    <string name="shuffle_enabled_unwatched">Shuffle on · Unwatched episodes</string>
++    <string name="shuffle_disabled">Shuffle off</string>
++    <string name="shuffle_save_failed">Could not update shuffle. Try again.</string>
++    <string name="shuffle_change_selection">Choose episodes</string>
++    <string name="shuffle_badge">Episode shuffle enabled</string>
+ </resources>
+diff --git a/app/src/test/java/com/nuvio/tv/core/player/EpisodeShufflePlaybackTest.kt b/app/src/test/java/com/nuvio/tv/core/player/EpisodeShufflePlaybackTest.kt
+new file mode 100644
+index 000000000..e4fe3fbc7
+--- /dev/null
++++ b/app/src/test/java/com/nuvio/tv/core/player/EpisodeShufflePlaybackTest.kt
+@@ -0,0 +1,135 @@
++package com.nuvio.tv.core.player
++
++import com.nuvio.tv.core.profile.ProfileManager
++import com.nuvio.tv.data.local.EpisodeShuffleProfile
++import com.nuvio.tv.data.local.EpisodeShuffleStore
++import com.nuvio.tv.data.local.WatchedItemsPreferences
++import com.nuvio.tv.domain.model.EpisodeShuffle
++import com.nuvio.tv.domain.model.EpisodeShuffleSettings
++import com.nuvio.tv.domain.model.Video
++import com.nuvio.tv.domain.model.WatchProgress
++import com.nuvio.tv.domain.repository.WatchProgressRepository
++import io.mockk.every
++import io.mockk.mockk
++import io.mockk.verify
++import kotlinx.coroutines.flow.MutableStateFlow
++import kotlinx.coroutines.flow.first
++import kotlinx.coroutines.test.runTest
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertNotEquals
++import org.junit.Assert.assertNull
++import org.junit.Assert.assertTrue
++import org.junit.Test
++
++class EpisodeShufflePlaybackTest {
++    private val show = "tmdb:123"
++    private val episodes = (1..5).map { Video("$show:1:$it", "Episode $it", "2020-01-01", null,
++        season = 1, episode = it, overview = null) }
++    private val settings = MutableStateFlow(EpisodeShuffleProfile(1, true,
++        mapOf(show to EpisodeShuffleSettings(true, false))))
++    private val progress = MutableStateFlow<Map<Pair<Int, Int>, WatchProgress>>(emptyMap())
++    private val watched = MutableStateFlow<Set<Pair<Int, Int>>>(emptySet())
++    private val active = MutableStateFlow(1)
++    private val store = mockk<EpisodeShuffleStore> {
++        every { observeProfile(any()) } returns settings
++    }
++    private val repository = mockk<WatchProgressRepository> {
++        every { getAllEpisodeProgress(any(), any()) } returns progress
++        every { isWatchedByVideoId(any(), any()) } returns false
++    }
++    private val watchedPreferences = mockk<WatchedItemsPreferences> {
++        every { getWatchedEpisodesForContent(any(), any()) } returns watched
++    }
++    private val profiles = mockk<ProfileManager> { every { activeProfileId } returns active }
++    private fun service() = EpisodeShufflePlayback(store, EpisodeShuffle(), repository, watchedPreferences, profiles)
++    private val service = service()
++    private val metadata = ExternalPlaybackMetadata(show, "series", "Show", null, null, null,
++        "$show:1:1", 1, 1, null, null, 1)
++
++    @Test
++    fun `namespaced content ids are passed intact to progress sources`() = runTest {
++        service.observe(1, show, "tv").first()
++        verify(exactly = 1) { repository.getAllEpisodeProgress("tmdb:123", 1) }
++        verify(exactly = 1) { watchedPreferences.getWatchedEpisodesForContent("tmdb:123", 1) }
++    }
++
++    @Test
++    fun `native next target survives external player handoff`() = runTest {
++        val state = service.observe(1, show, "series").first()
++        val native = service.nextEpisode(1, show, episodes, 1, 1, state)!!
++        val external = service.externalSnapshot(metadata, episodes)
++        assertEquals(native.id, external.nextVideoId)
++        assertEquals(native.episode, external.nextEpisode)
++        assertTrue(external.shufflePlayback)
++        assertNotEquals(metadata.videoId, external.nextVideoId)
++    }
++
++    @Test
++    fun `persisted external target is restored after service recreation`() = runTest {
++        val saved = service.externalSnapshot(metadata, episodes)
++        val restored = service().externalSnapshot(metadata, episodes, saved.nextVideoId)
++        assertEquals(saved, restored)
++    }
++
++    @Test
++    fun `completed target is replaced when returning from external playback`() = runTest {
++        val initial = service.externalSnapshot(metadata, episodes)
++        watched.value = setOf(initial.nextSeason!! to initial.nextEpisode!!)
++        val updated = service.externalSnapshot(metadata, episodes, initial.nextVideoId)
++        assertNotEquals(initial.nextVideoId, updated.nextVideoId)
++        assertTrue(updated.hasNextEpisode == true)
++    }
++
++    @Test
++    fun `unwatched exhaustion produces an authoritative empty snapshot`() = runTest {
++        watched.value = (2..5).map { 1 to it }.toSet()
++        val snapshot = service.externalSnapshot(metadata, episodes)
++        assertTrue(snapshot.metadataResolved)
++        assertTrue(snapshot.shufflePlayback)
++        assertFalse(snapshot.hasNextEpisode!!)
++        assertNull(snapshot.nextVideoId)
++    }
++
++    @Test
++    fun `missing launch season uses the current video to prevent replaying itself`() = runTest {
++        settings.value = settings.value.copy(shows = mapOf(show to EpisodeShuffleSettings(true, true)))
++        assertFalse(service.externalSnapshot(metadata.copy(season = null), episodes.take(1)).hasNextEpisode!!)
++    }
++
++    @Test
++    fun `disabled shuffle restores the sequential successor`() = runTest {
++        settings.value = settings.value.copy(shows = mapOf(show to EpisodeShuffleSettings(false, true)))
++        assertEquals(2, service.externalSnapshot(metadata, episodes).nextEpisode)
++        assertFalse(service.externalSnapshot(metadata, episodes).shufflePlayback)
++    }
++
++    @Test
++    fun `global off and movies retain normal playback`() = runTest {
++        settings.value = settings.value.copy(available = false)
++        assertEquals(2, service.externalSnapshot(metadata, episodes).nextEpisode)
++        settings.value = settings.value.copy(available = true)
++        assertFalse(service.externalSnapshot(metadata.copy(contentType = "movie"), episodes).shufflePlayback)
++    }
++
++    @Test
++    fun `remote watched results are included for the captured profile`() = runTest {
++        every { repository.isWatchedByVideoId(any(), any()) } returns true
++        assertFalse(service.externalSnapshot(metadata, episodes).hasNextEpisode!!)
++    }
++
++    @Test
++    fun `another active profiles remote cache cannot filter this playback`() = runTest {
++        active.value = 2
++        every { repository.isWatchedByVideoId(any(), any()) } returns true
++        assertTrue(service.externalSnapshot(metadata, episodes).hasNextEpisode!!)
++        verify(exactly = 0) { repository.isWatchedByVideoId(any(), any()) }
++    }
++
++    @Test
++    fun `all mode can revisit completed episodes`() = runTest {
++        settings.value = settings.value.copy(shows = mapOf(show to EpisodeShuffleSettings(true, true)))
++        watched.value = (1..5).map { 1 to it }.toSet()
++        assertTrue(service.externalSnapshot(metadata, episodes).hasNextEpisode!!)
++    }
++}
+diff --git a/app/src/test/java/com/nuvio/tv/data/local/EpisodeShuffleStoreTest.kt b/app/src/test/java/com/nuvio/tv/data/local/EpisodeShuffleStoreTest.kt
+new file mode 100644
+index 000000000..a32130768
+--- /dev/null
++++ b/app/src/test/java/com/nuvio/tv/data/local/EpisodeShuffleStoreTest.kt
+@@ -0,0 +1,91 @@
++package com.nuvio.tv.data.local
++
++import androidx.datastore.core.DataStore
++import androidx.datastore.preferences.core.Preferences
++import androidx.datastore.preferences.core.emptyPreferences
++import com.nuvio.tv.core.profile.ProfileManager
++import com.nuvio.tv.domain.model.EpisodeShuffleSettings
++import io.mockk.every
++import io.mockk.mockk
++import kotlinx.coroutines.flow.MutableStateFlow
++import kotlinx.coroutines.flow.first
++import kotlinx.coroutines.test.runTest
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertTrue
++import org.junit.Test
++
++class EpisodeShuffleStoreTest {
++    private class MemoryPreferences : DataStore<Preferences> {
++        override val data = MutableStateFlow(emptyPreferences())
++        override suspend fun updateData(transform: suspend (Preferences) -> Preferences): Preferences =
++            transform(data.value).also { data.value = it }
++    }
++
++    private val activeProfile = MutableStateFlow(1)
++    private val available = mutableMapOf<Int, MutableStateFlow<Boolean>>()
++    private val stores = mutableMapOf<Pair<Int, String>, MemoryPreferences>()
++    private val factory = mockk<ProfileDataStoreFactory> {
++        every { get(any(), any()) } answers {
++            stores.getOrPut(firstArg<Int>() to secondArg<String>(), ::MemoryPreferences)
++        }
++    }
++    private val profiles = mockk<ProfileManager> { every { activeProfileId } returns this@EpisodeShuffleStoreTest.activeProfile }
++    private val layout = mockk<LayoutPreferenceDataStore> {
++        every { randomEpisodeEnabledForProfile(any()) } answers {
++            available.getOrPut(firstArg()) { MutableStateFlow(true) }
++        }
++    }
++    private fun store() = EpisodeShuffleStore(factory, profiles, layout)
++
++    @Test
++    fun `show settings survive store recreation and remain independent`() = runTest {
++        store().save("tmdb:123", EpisodeShuffleSettings(true, true), 1)
++        store().save("tt456", EpisodeShuffleSettings(true, false), 1)
++        val restored = store().observeProfile(1).first()
++        assertEquals(EpisodeShuffleSettings(true, true), restored.settings("tmdb:123", "series"))
++        assertEquals(EpisodeShuffleSettings(true, false), restored.settings("tt456", "tv"))
++        assertFalse(restored.settings("other", "series").enabled)
++        assertFalse(restored.settings("tt456", "movie").enabled)
++    }
++
++    @Test
++    fun `disabling a show retains its pool`() = runTest {
++        val store = store()
++        store.save("show", EpisodeShuffleSettings(true, true), 1)
++        store.save("show", EpisodeShuffleSettings(false, true), 1)
++        assertEquals(EpisodeShuffleSettings(false, true), store.observeProfile(1).first().shows["show"])
++    }
++
++    @Test
++    fun `global switch pauses shuffle without clearing saved choices`() = runTest {
++        val store = store()
++        store.save("show", EpisodeShuffleSettings(true, true), 1)
++        assertTrue(store.observeProfile(1).first().settings("show", "series").enabled)
++        available.getValue(1).value = false
++        val paused = store.observeProfile(1).first()
++        assertFalse(paused.settings("show", "series").enabled)
++        assertEquals(EpisodeShuffleSettings(true, true), paused.shows["show"])
++        available.getValue(1).value = true
++        assertTrue(store.observeProfile(1).first().settings("show", "SERIES").enabled)
++    }
++
++    @Test
++    fun `profile changes do not move writes into another profile`() = runTest {
++        val store = store()
++        activeProfile.value = 2
++        store.save("show", EpisodeShuffleSettings(true, false), 1)
++        assertTrue(store.profiles.first().shows.isEmpty())
++        assertTrue(store.observeProfile(1).first().settings("show", "series").enabled)
++        store.save("show", EpisodeShuffleSettings(true, true), 2)
++        assertTrue(store.profiles.first().settings("show", "series").includeWatched)
++        assertFalse(store.observeProfile(1).first().settings("show", "series").includeWatched)
++    }
++
++    @Test
++    fun `empty show ids do not create preferences`() = runTest {
++        val store = store()
++        store.save(" ", EpisodeShuffleSettings(true, true), 1)
++        assertTrue(store.profiles.first().shows.isEmpty())
++    }
++}
+diff --git a/app/src/test/java/com/nuvio/tv/domain/model/EpisodeShuffleTest.kt b/app/src/test/java/com/nuvio/tv/domain/model/EpisodeShuffleTest.kt
+new file mode 100644
+index 000000000..c74caaa1d
+--- /dev/null
++++ b/app/src/test/java/com/nuvio/tv/domain/model/EpisodeShuffleTest.kt
+@@ -0,0 +1,178 @@
++package com.nuvio.tv.domain.model
++
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertNotEquals
++import org.junit.Assert.assertNull
++import org.junit.Test
++
++class EpisodeShuffleTest {
++    private val shuffle = EpisodeShuffle()
++    private val episodes = (1..8).map { episode(it) }
++
++    @Test
++    fun `next selection stays stable as metadata and progress refresh`() {
++        val first = select(current = 1 to 1)
++        repeat(30) {
++            assertEquals(first, select(current = 1 to 1))
++        }
++        val updated = episodes.map { it.copy(title = "Updated ${it.episode}") }
++        assertEquals(first?.id, select(videos = updated, current = 1 to 1)?.id)
++        assertEquals("Updated ${first?.episode}", select(videos = updated, current = 1 to 1)?.title)
++    }
++
++    @Test
++    fun `all plays a complete cycle without repeating the current episode`() {
++        var current = 1 to 1
++        val played = mutableListOf(1)
++        repeat(23) {
++            val next = select(current = current)!!
++            assertNotEquals(current, next.season to next.episode)
++            played.add(next.episode!!)
++            current = next.season!! to next.episode
++        }
++        played.chunked(8).forEach { assertEquals((1..8).toSet(), it.toSet()) }
++        assertNotEquals(current, select(current = current).let { it?.season to it?.episode })
++    }
++
++    @Test
++    fun `an explicitly chosen episode is honored before random continuation`() {
++        val next = select(current = 1 to 6)!!
++        assertNotEquals(6, next.episode)
++        val afterManualChoice = select(current = 1 to 3)!!
++        assertNotEquals(3, afterManualChoice.episode)
++    }
++
++    @Test
++    fun `an unplayed next preview stays eligible after choosing a different episode`() {
++        val catalogue = episodes.take(3)
++        val preview = select(videos = catalogue, current = 1 to 1)!!
++        val manual = catalogue.single { it.episode != 1 && it.id != preview.id }
++        val next = select(videos = catalogue, current = manual.season!! to manual.episode!!)!!
++        assertEquals(preview.id, next.id)
++    }
++
++    @Test
++    fun `unwatched stops after the last eligible episode`() {
++        val watched = (1..7).map { 1 to it }.toSet()
++        assertEquals(8, select(includeWatched = false, watched = watched)?.episode)
++        assertNull(select(includeWatched = false, watched = watched, current = 1 to 8))
++        assertNull(select(includeWatched = false, watched = watched + (1 to 8)))
++    }
++
++    @Test
++    fun `new completion invalidates an unwatched next target`() {
++        val next = select(includeWatched = false)!!
++        assertNotEquals(next, select(includeWatched = false, watched = setOf(next.season!! to next.episode!!)))
++    }
++
++    @Test
++    fun `partial progress remains eligible and source completion thresholds apply`() {
++        val progress = mapOf(
++            (1 to 1) to progress(1, 80f).copy(source = WatchProgress.SOURCE_SIMKL_PLAYBACK),
++            (1 to 2) to progress(2, 80f)
++        )
++        assertEquals(2, select(videos = episodes.take(2), includeWatched = false, progress = progress)?.episode)
++    }
++
++    @Test
++    fun `unavailable selection is replaced and an empty catalogue has no fallback`() {
++        val next = select()!!
++        val updated = episodes.map { if (it.id == next.id) it.copy(available = false) else it }
++        assertNotEquals(next.id, select(videos = updated)?.id)
++        assertNull(select(videos = emptyList()))
++    }
++
++    @Test
++    fun `single episode cannot continue into itself`() {
++        assertEquals(episodes.first(), select(videos = episodes.take(1)))
++        assertNull(select(videos = episodes.take(1), current = 1 to 1))
++    }
++
++    @Test
++    fun `home and detail browsing do not consume playback history`() {
++        var current = 1 to 1
++        val played = mutableSetOf(1)
++        repeat(7) { visit ->
++            repeat(4) { draw ->
++                select(surface = ShuffleSurface.HOME, visit = (visit * 4 + draw).toLong())
++                select(surface = ShuffleSurface.DETAIL, visit = (visit * 4 + draw).toLong())
++            }
++            val next = select(current = current)!!
++            played.add(next.episode!!)
++            current = next.season!! to next.episode
++        }
++        assertEquals((1..8).toSet(), played)
++    }
++
++    @Test
++    fun `profiles shows and filters keep independent histories`() {
++        val cycles = List(4) { mutableSetOf<Int>() }
++        repeat(8) { visit ->
++            cycles[0].add(select(visit = visit.toLong())!!.episode!!)
++            cycles[1].add(select(profile = 2, visit = visit.toLong())!!.episode!!)
++            cycles[2].add(select(show = "other", visit = visit.toLong())!!.episode!!)
++            cycles[3].add(select(includeWatched = false, visit = visit.toLong())!!.episode!!)
++        }
++        cycles.forEach { assertEquals((1..8).toSet(), it) }
++    }
++
++    @Test
++    fun `new visit advances selection while repeated emissions retain it`() {
++        val first = select(surface = ShuffleSurface.HOME, visit = 1)
++        assertEquals(first, select(surface = ShuffleSurface.HOME, visit = 1))
++        assertNotEquals(first, select(surface = ShuffleSurface.HOME, visit = 2))
++    }
++
++    @Test
++    fun `clearing a selection keeps the remaining bag intact`() {
++        val picked = mutableSetOf<Int>()
++        repeat(8) {
++            picked.add(select()!!.episode!!)
++            shuffle.clearSelection(1, "show", ShuffleSurface.PLAYBACK)
++        }
++        assertEquals((1..8).toSet(), picked)
++    }
++
++    @Test
++    fun `specials malformed future and duplicate episodes are excluded`() {
++        val invalid = listOf(
++            episode(0), episode(2).copy(season = 0), episode(3).copy(available = false),
++            episode(4).copy(released = "2999-01-01"), episode(5).copy(id = " "),
++            episode(6).copy(season = null), episode(7).copy(episode = null)
++        )
++        val valid = episode(1)
++        assertEquals(valid, select(videos = invalid + valid + valid.copy(id = "duplicate")))
++    }
++
++    @Test
++    fun `late catalogue expansion preserves the displayed episode`() {
++        val first = select(videos = episodes.take(2))
++        assertEquals(first, select())
++        val remaining = (1..7).map { select(visit = it.toLong())!!.id }
++        assertFalse(first!!.id in remaining)
++        assertEquals(7, remaining.toSet().size)
++    }
++
++    private fun select(
++        videos: List<Video> = episodes,
++        includeWatched: Boolean = true,
++        watched: Set<Pair<Int, Int>> = emptySet(),
++        progress: Map<Pair<Int, Int>, WatchProgress> = emptyMap(),
++        current: Pair<Int, Int>? = null,
++        surface: ShuffleSurface = ShuffleSurface.PLAYBACK,
++        visit: Long = 0,
++        profile: Int = 1,
++        show: String = "show"
++    ) = shuffle.select(profile, show, videos, includeWatched, watched, progress, surface, current, visit)
++
++    private fun episode(number: Int) = Video(
++        "show:1:$number", "Episode $number", "2020-01-01", null,
++        season = 1, episode = number, overview = null
++    )
++
++    private fun progress(number: Int, percent: Float) = WatchProgress(
++        "show", "series", "Show", null, null, null, "show:1:$number", 1, number,
++        null, 0, 0, 0, progressPercent = percent
++    )
++}
+diff --git a/app/src/test/java/com/nuvio/tv/domain/model/RandomEpisodePickerTest.kt b/app/src/test/java/com/nuvio/tv/domain/model/RandomEpisodePickerTest.kt
+new file mode 100644
+index 000000000..9f6dde30c
+--- /dev/null
++++ b/app/src/test/java/com/nuvio/tv/domain/model/RandomEpisodePickerTest.kt
+@@ -0,0 +1,170 @@
++package com.nuvio.tv.domain.model
++
++import kotlin.random.Random
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertNotEquals
++import org.junit.Assert.assertNull
++import org.junit.Assert.assertTrue
++import org.junit.Test
++
++class RandomEpisodePickerTest {
++    @Test
++    fun `unwatched excludes marked and completed episodes but keeps partial progress`() {
++        val picker = picker(
++            episodes = (1..4).map(::episode),
++            watched = setOf(1 to 1),
++            progress = mapOf(1 to 2 to progress(2, 100f), 1 to 3 to progress(3, 40f))
++        )
++
++        assertEquals(4, picker.count(true))
++        assertEquals(2, picker.count(false))
++        assertEquals(setOf(3, 4), (1..2).map { picker.pick(false)?.episode }.toSet())
++        assertTrue(picker.isWatched(episode(1)))
++        assertTrue(picker.isWatched(episode(2)))
++        assertFalse(picker.isWatched(episode(3)))
++    }
++
++    @Test
++    fun `watched episodes require explicit inclusion when caught up`() {
++        val picker = picker(listOf(episode(1)), watched = setOf(1 to 1))
++
++        assertEquals(0, picker.count(false))
++        assertNull(picker.pick(false))
++        assertEquals(episode(1), picker.pick(true))
++    }
++
++    @Test
++    fun `completion follows the tracking source threshold`() {
++        val picker = picker(
++            episodes = listOf(episode(1), episode(2)),
++            progress = mapOf(
++                (1 to 1) to progress(1, 80f).copy(source = WatchProgress.SOURCE_SIMKL_PLAYBACK),
++                (1 to 2) to progress(2, 80f)
++            )
++        )
++
++        assertEquals(1, picker.count(false))
++        assertEquals(episode(2), picker.pick(false))
++    }
++
++    @Test
++    fun `every episode appears before repeats and cycle boundary avoids immediate repeat`() {
++        val episodes = (1..20).map(::episode)
++        val picker = picker(episodes)
++        val firstCycle = episodes.map { picker.pick(true) }
++        val secondCycle = episodes.map { picker.pick(true) }
++
++        assertEquals(episodes.toSet(), firstCycle.toSet())
++        assertEquals(episodes.toSet(), secondCycle.toSet())
++        assertNotEquals(firstCycle.last(), secondCycle.first())
++    }
++
++    @Test
++    fun `changing the watched filter keeps prior picks out while fresh options remain`() {
++        val picker = picker((1..4).map(::episode), watched = setOf(1 to 1))
++        val first = picker.pick(false)
++        val remaining = (1..3).map { picker.pick(true) }
++
++        assertFalse(first in remaining)
++        assertEquals(4, (remaining + first).toSet().size)
++    }
++
++    @Test
++    fun `refresh preserves picks made while the new metadata was loading`() {
++        val original = picker((1..4).map(::episode))
++        val first = original.pick(true)
++        val updated = picker((1..4).map { episode(it).copy(title = "Updated $it") })
++        val second = original.pick(true)
++
++        updated.inheritHistoryFrom(original)
++
++        val nextPicks = (1..2).map { updated.pick(true)?.id }.toSet()
++        assertFalse(first?.id in nextPicks)
++        assertFalse(second?.id in nextPicks)
++        assertEquals(2, nextPicks.size)
++    }
++
++    @Test
++    fun `refreshed selection resolves current metadata and respects watched filtering`() {
++        val updatedEpisode = episode(1).copy(title = "Updated title")
++        val updated = picker(listOf(updatedEpisode, episode(2)), watched = setOf(1 to 1))
++
++        assertEquals(updatedEpisode, updated.find(updatedEpisode.id, includeWatched = true))
++        assertNull(updated.find(updatedEpisode.id, includeWatched = false))
++        assertNull(updated.find(episode(3).id, includeWatched = true))
++    }
++
++    @Test
++    fun `selection spans seasons and follows existing release availability rules`() {
++        val available = episode(1)
++        val secondSeason = episode(1).copy(id = "show:2:1", season = 2)
++        val picker = picker(
++            listOf(
++                available,
++                secondSeason,
++                episode(2).copy(available = false),
++                episode(3).copy(released = "2999-01-01T00:00:00Z"),
++                episode(4).copy(season = 0),
++                episode(5).copy(season = null),
++                episode(6).copy(episode = null),
++                episode(0),
++                episode(7).copy(id = " ")
++            )
++        )
++
++        assertEquals(2, picker.count(true))
++        assertEquals(setOf(available, secondSeason), (1..2).map { picker.pick(true) }.toSet())
++    }
++
++    @Test
++    fun `duplicates do not bias the selection or produce repeated playback ids`() {
++        val first = episode(1)
++        val picker = picker(listOf(first, first.copy(id = "alternate"), first.copy(episode = 2), episode(3)))
++
++        assertEquals(2, picker.count(true))
++        assertEquals(setOf(first, episode(3)), (1..2).map { picker.pick(true) }.toSet())
++    }
++
++    @Test
++    fun `unknown release dates remain eligible`() {
++        val unknown = episode(1).copy(released = null)
++        assertEquals(unknown, picker(listOf(unknown)).pick(false))
++    }
++
++    @Test
++    fun `empty and single episode pools are safe`() {
++        assertNull(picker(emptyList()).pick(true))
++        val single = picker(listOf(episode(1)))
++        repeat(3) { assertEquals(episode(1), single.pick(false)) }
++    }
++
++    private fun picker(
++        episodes: List<Video>,
++        watched: Set<Pair<Int, Int>> = emptySet(),
++        progress: Map<Pair<Int, Int>, WatchProgress> = emptyMap()
++    ) = RandomEpisodePicker(
++        meta = Meta(
++            id = "show", type = ContentType.SERIES, name = "Show", poster = null,
++            posterShape = PosterShape.POSTER, background = null, logo = null, description = null,
++            releaseInfo = null, imdbRating = null, genres = emptyList(), runtime = null,
++            director = emptyList(), cast = emptyList(), videos = episodes, country = null,
++            awards = null, language = null, links = emptyList()
++        ),
++        watchedEpisodes = watched,
++        episodeProgress = progress,
++        random = Random(42)
++    )
++
++    private fun episode(number: Int) = Video(
++        id = "show:1:$number", title = "Episode $number", released = "2020-01-01",
++        thumbnail = null, season = 1, episode = number, overview = null
++    )
++
++    private fun progress(number: Int, percent: Float) = WatchProgress(
++        contentId = "show", contentType = "series", name = "Show", poster = null,
++        backdrop = null, logo = null, videoId = "show:1:$number", season = 1,
++        episode = number, episodeTitle = null, position = 0, duration = 0,
++        lastWatched = 0, progressPercent = percent
++    )
++}
+diff --git a/app/src/test/java/com/nuvio/tv/ui/screens/detail/DetailEpisodeShuffleTest.kt b/app/src/test/java/com/nuvio/tv/ui/screens/detail/DetailEpisodeShuffleTest.kt
+new file mode 100644
+index 000000000..d22b66dcd
+--- /dev/null
++++ b/app/src/test/java/com/nuvio/tv/ui/screens/detail/DetailEpisodeShuffleTest.kt
+@@ -0,0 +1,120 @@
++package com.nuvio.tv.ui.screens.detail
++
++import android.content.Context
++import com.nuvio.tv.data.local.EpisodeShuffleProfile
++import com.nuvio.tv.domain.model.ContentType
++import com.nuvio.tv.domain.model.EpisodeShuffle
++import com.nuvio.tv.domain.model.EpisodeShuffleSettings
++import com.nuvio.tv.domain.model.Meta
++import com.nuvio.tv.domain.model.NextToWatch
++import com.nuvio.tv.domain.model.Video
++import com.nuvio.tv.domain.model.WatchProgress
++import io.mockk.every
++import io.mockk.mockk
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertNotEquals
++import org.junit.Assert.assertNull
++import org.junit.Assert.assertTrue
++import org.junit.Test
++
++class DetailEpisodeShuffleTest {
++    private val context = mockk<Context>(relaxed = true)
++    private val videos = (1..5).map { Video("show:1:$it", "Episode $it", "2020-01-01", null,
++        season = 1, episode = it, overview = null) }
++    private val meta = mockk<Meta> {
++        every { id } returns "show"
++        every { imdbId } returns "tt123"
++        every { apiType } returns "series"
++        every { type } returns ContentType.SERIES
++        every { behaviorHints } returns null
++        every { videos } returns this@DetailEpisodeShuffleTest.videos
++    }
++    private val native = NextToWatch(null, false, videos.first().id, 1, 1, "Play")
++    private val state = MetaDetailsUiState(meta = meta, nextToWatch = native)
++    private val profile = EpisodeShuffleProfile(1, true, mapOf("show" to EpisodeShuffleSettings(true, false)))
++    private val shuffle = EpisodeShuffle()
++
++    @Test
++    fun `normal play returns when a show or global shuffle is disabled`() {
++        assertEquals(native, project(profile = profile.copy(available = false)).nextToWatch)
++        assertEquals(native, project(profile = profile.copy(shows = emptyMap())).nextToWatch)
++    }
++
++    @Test
++    fun `a random main play target stays stable during detail updates`() {
++        val first = project().nextToWatch
++        repeat(20) { assertEquals(first, project().nextToWatch) }
++        assertNotEquals(first?.nextVideoId, project(visit = 2).nextToWatch?.nextVideoId)
++    }
++
++    @Test
++    fun `latest incomplete continue watching episode wins over stale native resume`() {
++        val stale = state.copy(nextToWatch = native.copy(isResume = true))
++        val latest = progress(4).copy(lastWatched = 10)
++        val result = project(stale, listOf(progress(2), latest))
++        assertEquals(latest.videoId, result.nextToWatch?.nextVideoId)
++        assertEquals(latest, result.nextToWatch?.watchProgress)
++        assertTrue(result.nextToWatch!!.isResume)
++    }
++
++    @Test
++    fun `removing resume does not resurrect cached progress`() {
++        val stale = state.copy(nextToWatch = native.copy(isResume = true, watchProgress = progress(1)))
++        assertFalse(project(stale).nextToWatch!!.isResume)
++        assertFalse(project(stale, listOf(progress(1).copy(progressPercent = 100f))).nextToWatch!!.isResume)
++    }
++
++    @Test
++    fun `resume uses a precise saved video id even when catalogue metadata differs`() {
++        val saved = progress(3).copy(videoId = "addon-specific-video")
++        val next = project(resume = listOf(saved)).nextToWatch
++        val video = resolveHeroPlaybackVideo(meta, next, videos)
++        assertEquals(saved.videoId, video?.id)
++        assertEquals(saved.season, video?.season)
++        assertEquals(saved.episode, video?.episode)
++    }
++
++    @Test
++    fun `an exhausted pool has no playback target but incomplete resume remains available`() {
++        val complete = state.copy(watchedEpisodes = videos.map { it.season!! to it.episode!! }.toSet())
++        assertTrue(project(complete).shufflePoolEmpty)
++        assertNull(project(complete).nextToWatch?.nextVideoId)
++        val resumed = project(complete, listOf(progress(3)))
++        assertFalse(resumed.shufflePoolEmpty)
++        assertEquals("show:1:3", resumed.nextToWatch?.nextVideoId)
++    }
++
++    @Test
++    fun `imdb alias resume is accepted and other shows are excluded`() {
++        val alias = progress(2).copy(contentId = "tt123")
++        assertEquals(alias, project(resume = listOf(alias)).nextToWatch?.watchProgress)
++        assertFalse(project(resume = listOf(alias.copy(contentId = "other"))).nextToWatch!!.isResume)
++    }
++
++    @Test
++    fun `tiny precise positions remain resumable without duration metadata`() {
++        val saved = progress(2).copy(progressPercent = null, position = 600, duration = 0)
++        assertTrue(project(resume = listOf(saved)).nextToWatch!!.isResume)
++    }
++
++    @Test
++    fun `enabling shuffle cannot change a movies play target`() {
++        every { meta.apiType } returns "movie"
++        val result = project()
++        assertFalse(result.episodeShuffle.enabled)
++        assertEquals(native, result.nextToWatch)
++    }
++
++    private fun project(
++        input: MetaDetailsUiState = state,
++        resume: List<WatchProgress> = emptyList(),
++        profile: EpisodeShuffleProfile = this.profile,
++        visit: Long = 1
++    ) = applyDetailShuffle(input, profile, resume, shuffle, visit, context)
++
++    private fun progress(number: Int) = WatchProgress(
++        "show", "series", "Show", null, null, null, "show:1:$number", 1, number,
++        "Episode $number", 100, 1000, 1, progressPercent = 50f
++    )
++}
+diff --git a/app/src/test/java/com/nuvio/tv/ui/screens/home/HomeEnrichmentRepositoryBoundaryTest.kt b/app/src/test/java/com/nuvio/tv/ui/screens/home/HomeEnrichmentRepositoryBoundaryTest.kt
+index 33081becf..40a1ee006 100644
+--- a/app/src/test/java/com/nuvio/tv/ui/screens/home/HomeEnrichmentRepositoryBoundaryTest.kt
++++ b/app/src/test/java/com/nuvio/tv/ui/screens/home/HomeEnrichmentRepositoryBoundaryTest.kt
+@@ -176,6 +176,8 @@ class HomeEnrichmentRepositoryBoundaryTest {
+                 every { getAllEpisodeProgress(any()) } returns flowOf(emptyMap())
+             }
+         val viewModel = HomeViewModel(
++            episodeShuffleStore = mockk(relaxed = true),
++            episodeShuffle = com.nuvio.tv.domain.model.EpisodeShuffle(),
+             appContext = mockk(relaxed = true),
+             addonRepository = mockk(relaxed = true),
+             startupSyncService = mockk(relaxed = true),
+diff --git a/app/src/test/java/com/nuvio/tv/ui/screens/home/HomeEnrichmentRetryTest.kt b/app/src/test/java/com/nuvio/tv/ui/screens/home/HomeEnrichmentRetryTest.kt
+index 50dd87161..c2d757844 100644
+--- a/app/src/test/java/com/nuvio/tv/ui/screens/home/HomeEnrichmentRetryTest.kt
++++ b/app/src/test/java/com/nuvio/tv/ui/screens/home/HomeEnrichmentRetryTest.kt
+@@ -441,6 +441,8 @@ class HomeEnrichmentRetryTest {
+                 every { getAllEpisodeProgress(any()) } returns flowOf(emptyMap())
+             }
+         val viewModel = HomeViewModel(
++            episodeShuffleStore = mockk(relaxed = true),
++            episodeShuffle = com.nuvio.tv.domain.model.EpisodeShuffle(),
+             appContext = mockk(relaxed = true),
+             addonRepository = mockk(relaxed = true),
+             startupSyncService = mockk(relaxed = true),
+diff --git a/app/src/test/java/com/nuvio/tv/ui/screens/home/HomeEpisodeShuffleTest.kt b/app/src/test/java/com/nuvio/tv/ui/screens/home/HomeEpisodeShuffleTest.kt
+new file mode 100644
+index 000000000..616bbc231
+--- /dev/null
++++ b/app/src/test/java/com/nuvio/tv/ui/screens/home/HomeEpisodeShuffleTest.kt
+@@ -0,0 +1,133 @@
++package com.nuvio.tv.ui.screens.home
++
++import com.nuvio.tv.data.local.EpisodeShuffleProfile
++import com.nuvio.tv.domain.model.ContinueWatchingSortMode
++import com.nuvio.tv.domain.model.EpisodeShuffle
++import com.nuvio.tv.domain.model.EpisodeShuffleSettings
++import com.nuvio.tv.domain.model.Video
++import com.nuvio.tv.domain.model.WatchProgress
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertNotEquals
++import org.junit.Assert.assertTrue
++import org.junit.Test
++
++class HomeEpisodeShuffleTest {
++    private val videos = (1..5).map { Video("show:1:$it", "Episode $it", "2020-01-01", "image-$it",
++        season = 1, episode = it, overview = "Description $it") }
++    private val upcoming = ContinueWatchingItem.NextUp(NextUpInfo(
++        "show", "series", "Show", null, null, null, "show:2:1", 2, 1, "Upcoming",
++        thumbnail = null, released = "2999-01-01", hasAired = false, airDateLabel = "Soon",
++        lastWatched = 100, sortTimestamp = 100, isReleaseAlert = true, isNewSeasonRelease = true
++    ))
++    private val state = HomeUiState(upcomingItems = listOf(upcoming))
++    private val profile = EpisodeShuffleProfile(1, true, mapOf("show" to EpisodeShuffleSettings(true, false)))
++    private val shuffle = EpisodeShuffle()
++
++    @Test
++    fun `card details and playback id describe the same aired random episode`() {
++        val card = project().continueWatchingItems.single() as ContinueWatchingItem.NextUp
++        val episode = videos.single { it.id == card.info.videoId }
++        assertEquals(episode.title, card.info.episodeTitle)
++        assertEquals(episode.overview, card.info.episodeDescription)
++        assertEquals(episode.thumbnail, card.info.thumbnail)
++        assertEquals(episode.episode, card.info.episode)
++        assertTrue(card.info.hasAired)
++        assertTrue(card.shufflePlayback)
++        assertFalse(card.info.isReleaseAlert)
++        assertFalse(card.info.isNewSeasonRelease)
++        assertTrue(project().upcomingItems.isEmpty())
++    }
++
++    @Test
++    fun `disabling shuffle restores native upcoming data`() {
++        project()
++        assertEquals(state, project(profile = profile.copy(available = false)))
++        assertEquals(state, project(profile = profile.copy(shows = emptyMap())))
++    }
++
++    @Test
++    fun `home emissions preserve selection and a new visit advances it`() {
++        val first = project().continueWatchingItems.single()
++        repeat(20) { assertEquals(first, project().continueWatchingItems.single()) }
++        assertNotEquals(first, project(visit = 2).continueWatchingItems.single())
++    }
++
++    @Test
++    fun `focus identity follows the show across random targets and resume`() {
++        val first = project().continueWatchingItems.single()
++        val second = project(visit = 2).continueWatchingItems.single()
++        val resume = ContinueWatchingItem.InProgress(progress(), shufflePlayback = true)
++        assertEquals(first.shuffleFocusKey, second.shuffleFocusKey)
++        assertEquals(first.shuffleFocusKey, resume.shuffleFocusKey)
++        assertEquals(continueWatchingItemKey(first), continueWatchingItemKey(second))
++    }
++
++    @Test
++    fun `continue watching keeps the exact incomplete episode and position`() {
++        val resume = ContinueWatchingItem.InProgress(progress())
++        val projected = project(input = HomeUiState(continueWatchingItems = listOf(resume)))
++        val card = projected.continueWatchingItems.single() as ContinueWatchingItem.InProgress
++        assertEquals(resume.progress, card.progress)
++        assertTrue(card.shufflePlayback)
++    }
++
++    @Test
++    fun `latest resume replaces transient next up and older progress without duplicate focus keys`() {
++        val older = ContinueWatchingItem.InProgress(progress())
++        val latest = ContinueWatchingItem.InProgress(progress().copy(videoId = "show:1:4", episode = 4, lastWatched = 200))
++        val input = HomeUiState(continueWatchingItems = listOf(older, latest), upcomingItems = listOf(upcoming))
++        val output = project(input)
++        assertEquals(listOf(latest.copy(shufflePlayback = true)), output.continueWatchingItems)
++        assertTrue(output.upcomingItems.isEmpty())
++    }
++
++    @Test
++    fun `exhausted unwatched pool removes random next up without replacing resume`() {
++        val watched = videos.map { it.season!! to it.episode!! }.toSet()
++        assertTrue(project(watched = mapOf("show" to watched)).continueWatchingItems.isEmpty())
++        val resume = ContinueWatchingItem.InProgress(progress())
++        val input = HomeUiState(continueWatchingItems = listOf(resume))
++        assertEquals(resume.progress, (project(input, watched = mapOf("show" to watched))
++            .continueWatchingItems.single() as ContinueWatchingItem.InProgress).progress)
++    }
++
++    @Test
++    fun `late metadata makes a hidden random card available`() {
++        assertTrue(project(catalogue = null).continueWatchingItems.isEmpty())
++        assertEquals(1, project().continueWatchingItems.size)
++    }
++
++    @Test
++    fun `removing a native card cannot be undone by the shuffle projection`() {
++        project()
++        assertTrue(project(HomeUiState()).continueWatchingItems.isEmpty())
++    }
++
++    @Test
++    fun `movies and disabled shows preserve their native targets`() {
++        val movie = ContinueWatchingItem.InProgress(progress().copy(contentType = "movie"))
++        assertFalse((project(HomeUiState(continueWatchingItems = listOf(movie)))
++            .continueWatchingItems.single()).shufflePlayback)
++        val other = upcoming.copy(info = upcoming.info.copy(contentId = "other"))
++        assertEquals(listOf(other), project(HomeUiState(upcomingItems = listOf(other))).upcomingItems)
++    }
++
++    @Test
++    fun `completed watched ids exclude a target while all mode retains it`() {
++        val allWatched = mapOf("show" to videos.map { it.season!! to it.episode!! }.toSet())
++        val all = profile.copy(shows = mapOf("show" to EpisodeShuffleSettings(true, true)))
++        assertEquals(1, project(profile = all, watched = allWatched).continueWatchingItems.size)
++    }
++
++    private fun project(
++        input: HomeUiState = state,
++        profile: EpisodeShuffleProfile = this.profile,
++        watched: Map<String, Set<Pair<Int, Int>>> = emptyMap(),
++        visit: Long = 1,
++        catalogue: List<Video>? = videos
++    ) = applyHomeShuffle(input, profile, watched, shuffle, visit, ContinueWatchingSortMode.SPLIT_UPCOMING) { _, _ -> catalogue }
++
++    private fun progress() = WatchProgress("show", "series", "Show", null, null, null,
++        "show:1:3", 1, 3, "Episode 3", 34000, 100000, 100, progressPercent = 34f)
++}

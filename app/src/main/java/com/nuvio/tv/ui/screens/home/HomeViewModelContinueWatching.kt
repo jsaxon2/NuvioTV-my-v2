@@ -2473,6 +2473,7 @@ private suspend fun HomeViewModel.resolveMetaForProgress(
             cwMetaNegativeCacheTimestamps.remove(cacheKey)
         }
     }
+    shuffleHomeRefresh.update { it.copy(metadata = it.metadata + 1) }
     return resolved
 }
 

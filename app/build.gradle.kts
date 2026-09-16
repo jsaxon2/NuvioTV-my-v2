@@ -92,10 +92,11 @@ android {
 
     defaultConfig {
         applicationId = "com.nuvio.tv.test.jack"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         minSdk = 24
         targetSdk = 36
-        versionCode = 1360
-        versionName = "0.9.0-beta-nt1"
+        versionCode = 1361
+        versionName = "0.9.1-beta-nt1"
 
         buildConfigField("String", "PARENTAL_GUIDE_API_URL", "\"${localProperties.getProperty("PARENTAL_GUIDE_API_URL", "")}\"")
         buildConfigField("String", "INTRODB_API_URL", "\"${localProperties.getProperty("INTRODB_API_URL", "")}\"")

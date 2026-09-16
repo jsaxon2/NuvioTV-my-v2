@@ -57,6 +57,8 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
@@ -108,8 +110,9 @@ class MetaDetailsViewModel @Inject constructor(
     private val traktRelatedService: TraktRelatedService,
     private val traktSettingsDataStore: TraktSettingsDataStore,
     private val layoutPreferenceDataStore: LayoutPreferenceDataStore,
-    private val playerSettingsDataStore: PlayerSettingsDataStore,
-    private val watchedSeriesStateHolder: com.nuvio.tv.data.local.WatchedSeriesStateHolder,
+    private val episodeShuffleStore: com.nuvio.tv.data.local.EpisodeShuffleStore,
+    private val episodeShuffle: com.nuvio.tv.domain.model.EpisodeShuffle,
+    private val playerSettingsDataStore: PlayerSettingsDataStore,private val watchedSeriesStateHolder: com.nuvio.tv.data.local.WatchedSeriesStateHolder,
     val posterOptions: com.nuvio.tv.ui.components.posteroptions.PosterOptionsController,
     private val prefetchSelectionSupplier: com.nuvio.tv.core.stream.PrefetchSelectionSupplier,
     savedStateHandle: SavedStateHandle,
@@ -124,7 +127,12 @@ class MetaDetailsViewModel @Inject constructor(
     private val preferredAddonBaseUrl: String? = savedStateHandle["addonBaseUrl"]
 
     private val _uiState = MutableStateFlow(MetaDetailsUiState())
-    val uiState: StateFlow<MetaDetailsUiState> = _uiState.asStateFlow()
+    private val shuffleVisit = System.nanoTime()
+    val uiState: StateFlow<MetaDetailsUiState> = combine(
+        _uiState, episodeShuffleStore.profiles, watchProgressRepository.continueWatching
+    ) { state, profile, progress ->
+        applyDetailShuffle(state, profile, progress, episodeShuffle, shuffleVisit, localizedContext)
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, MetaDetailsUiState())
 
     // S4a: the details page resolves its play target (NextToWatch -> the
     // "Next S1 E2" / "Resume ..." button) well before the press, but the addon
@@ -855,6 +863,30 @@ class MetaDetailsViewModel @Inject constructor(
                         }
                     }
                 }
+        }
+    }
+
+    suspend fun setEpisodeShuffle(settings: com.nuvio.tv.domain.model.EpisodeShuffleSettings): Boolean {
+        val meta = uiState.value.meta ?: return false
+        val profileId = profileManager.activeProfileId.value
+        val previous = uiState.value.episodeShuffle
+        return try {
+            episodeShuffleStore.save(meta.id, settings, profileId)
+            if (profileManager.activeProfileId.value != profileId) return false
+            if (previous.enabled != settings.enabled || (settings.enabled && previous.includeWatched != settings.includeWatched)) {
+                val message = when {
+                    !settings.enabled -> R.string.shuffle_disabled
+                    settings.includeWatched -> R.string.shuffle_enabled_all
+                    else -> R.string.shuffle_enabled_unwatched
+                }
+                showMessage(localizedContext.getString(message))
+            }
+            true
+        } catch (error: CancellationException) {
+            throw error
+        } catch (_: Exception) {
+            showMessage(localizedContext.getString(R.string.shuffle_save_failed), isError = true)
+            false
         }
     }
 

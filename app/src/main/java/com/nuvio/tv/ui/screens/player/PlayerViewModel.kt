@@ -77,6 +77,7 @@ class PlayerViewModel @Inject constructor(
     private val streamBadgeSettingsDataStore: StreamBadgeSettingsDataStore,
     private val bingeGroupCacheDataStore: com.nuvio.tv.data.local.BingeGroupCacheDataStore,
     private val layoutPreferenceDataStore: com.nuvio.tv.data.local.LayoutPreferenceDataStore,
+    private val episodeShufflePlayback: com.nuvio.tv.core.player.EpisodeShufflePlayback,
     private val watchedItemsPreferences: com.nuvio.tv.data.local.WatchedItemsPreferences,
     private val watchedSeriesStateHolder: WatchedSeriesStateHolder,
     private val trackPreferenceDataStore: com.nuvio.tv.data.local.TrackPreferenceDataStore,
@@ -137,6 +138,7 @@ class PlayerViewModel @Inject constructor(
         bingeGroupCacheDataStore = bingeGroupCacheDataStore,
         layoutPreferenceDataStore = layoutPreferenceDataStore,
         watchedItemsPreferences = watchedItemsPreferences,
+        episodeShufflePlayback = episodeShufflePlayback,
         trackPreferenceDataStore = trackPreferenceDataStore,
         audioDelayRouteDataStore = audioDelayRouteDataStore,
         torrentService = torrentService,
@@ -1178,16 +1180,6 @@ class PlayerViewModel @Inject constructor(
             profileId = controller.profileId
         )
         val headers = controller.getCurrentHeaders()
-        val nextEpisodeSnapshot = controller.metaVideos
-            .takeIf { it.isNotEmpty() }
-            ?.let { videos ->
-                com.nuvio.tv.core.player.resolveExternalNextEpisodeSnapshot(
-                    videos = videos,
-                    currentSeason = metadata.season,
-                    currentEpisode = metadata.episode
-                )
-            }
-
         // Capture already-loaded addon subtitles before handing off. Preparation stays in the
         // ViewModel scope because the player screen remains alive until the intent is sent.
         val subtitleInputs = if (controller.uiState.value.subtitleStyle.preferredLanguage.trim().lowercase() != "none") {
@@ -1217,6 +1209,9 @@ class PlayerViewModel @Inject constructor(
 
             // Stop the internal player only after preparation has completed and immediately
             // before sending the external intent.
+            val nextEpisodeSnapshot = controller.metaVideos.takeIf { it.isNotEmpty() }?.let {
+                externalPlaybackTracker.resolveNextEpisodeSnapshot(metadata, it)
+            }
             controller.stopAndRelease()
             val launched = try {
                 externalPlaybackTracker.launchPlayer(
