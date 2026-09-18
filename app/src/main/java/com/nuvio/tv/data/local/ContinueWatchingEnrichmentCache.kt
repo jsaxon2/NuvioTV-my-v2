@@ -62,6 +62,7 @@ data class CachedInProgressItem(
     val episodeDescription: String? = null,
     val episodeImdbRating: Float? = null,
     val genres: List<String> = emptyList(),
+    val episodeReleased: String? = null,
     val releaseInfo: String? = null,
     val contentLanguage: String? = null
 )

@@ -91,7 +91,7 @@ android {
     ndkVersion = "29.0.14206865"
 
     defaultConfig {
-        applicationId = "com.nuvio.tv.test"
+        applicationId = "com.nuvio.tv.test.jack"
         minSdk = 24
         targetSdk = 36
         versionCode = 1360
