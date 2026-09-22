@@ -1261,8 +1261,9 @@ internal fun ModernRowSection(
                     }
                 ) { index, item ->
                     val requester = itemFocusRequesters.getOrPut(index) { FocusRequester() }
-                    val isContinueWatchingRow = row.key == MODERN_CONTINUE_WATCHING_ROW_KEY || row.key == MODERN_UPCOMING_ROW_KEY ||
-                        row.key == MODERN_COMING_UP_ROW_KEY
+                    val isContinueWatchingRow = row.key == MODERN_CONTINUE_WATCHING_ROW_KEY ||
+                        row.key == MODERN_CONTINUE_WATCHING_MOVIES_ROW_KEY ||
+                        row.key == MODERN_UPCOMING_ROW_KEY || row.key == MODERN_COMING_UP_ROW_KEY
                     // Straight from the card's focus callback: the ring must start gliding before the row scrolls.
                     val onFocusGained = remember(row.key, index) {
                         { focusGlide.moveTo(index, rowListState, focusGlideScope) }

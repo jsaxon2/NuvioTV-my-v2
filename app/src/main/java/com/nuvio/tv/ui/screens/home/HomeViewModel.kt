@@ -250,6 +250,17 @@ class HomeViewModel @Inject constructor(
 
     fun onContinueWatchingItemFocused(index: Int) {
         val item = uiState.value.continueWatchingItems.getOrNull(index) ?: return
+        onContinueWatchingItemFocused(item)
+    }
+
+    /** Index is into the Series or Movies split of continueWatchingItems. */
+    fun onContinueWatchingSplitItemFocused(index: Int, movies: Boolean) {
+        val (series, movieItems) = uiState.value.continueWatchingItems.splitSeriesAndMovies()
+        val item = (if (movies) movieItems else series).getOrNull(index) ?: return
+        onContinueWatchingItemFocused(item)
+    }
+
+    fun onContinueWatchingItemFocused(item: ContinueWatchingItem) {
         if (item is ContinueWatchingItem.NextUp && !item.info.hasAired) return
         val target = cwPrefetchTargetOf(item) ?: return
         cwFocusPrefetchRequests.tryEmit(target)
