@@ -41,7 +41,8 @@ internal fun buildModernHomePresentation(
 ): ModernHomePresentationState {
     val visibleHomeRows = resolveVisibleHomeRows(input)
     val localizedContext = context.withAppLocale()
-    val strContinueWatching = localizedContext.getString(R.string.continue_watching)
+    val strContinueWatchingSeries = localizedContext.getString(R.string.continue_watching_series)
+    val strContinueWatchingMovies = localizedContext.getString(R.string.continue_watching_movies)
     val strAirsDate = localizedContext.getString(R.string.cw_airs_date)
     val strUpcoming = localizedContext.getString(R.string.cw_upcoming)
     val strTypeMovie = localizedContext.getString(R.string.type_movie)
@@ -53,47 +54,87 @@ internal fun buildModernHomePresentation(
         val catalogRowLimit = maxCatalogRows?.coerceAtLeast(0)
         var renderedCatalogRows = 0
 
-        if (input.continueWatchingItems.isNotEmpty()) {
+        val (continueWatchingSeriesItems, continueWatchingMovieItems) =
+            input.continueWatchingItems.splitSeriesAndMovies()
+        // Row-wide display settings shared by both Continue Watching rows; checked
+        // before the cache is updated so each row can decide whether to reuse.
+        val continueWatchingSettingsUnchanged =
+            cache.continueWatchingAirsDateTemplate == strAirsDate &&
+                cache.continueWatchingUpcomingLabel == strUpcoming &&
+                cache.continueWatchingUseLandscapePosters == input.useLandscapePosters &&
+                cache.continueWatchingShowImdbRatings == input.showImdbRatings
+        fun buildContinueWatchingRow(key: String, title: String, items: List<ContinueWatchingItem>) =
+            HeroCarouselRow(
+                key = key,
+                title = title,
+                globalRowIndex = -1,
+                items = items.map { item ->
+                    buildContinueWatchingItem(
+                        item = item,
+                        useLandscapePosters = input.useLandscapePosters,
+                        showImdbRatings = input.showImdbRatings,
+                        detailImdbRatingsVisibility = input.detailImdbRatingsVisibility,
+                        airsDateTemplate = strAirsDate,
+                        upcomingLabel = strUpcoming,
+                        context = localizedContext
+                    )
+                }.asStable()
+            )
+
+        // Continue Watching Series row
+        if (continueWatchingSeriesItems.isNotEmpty()) {
             val reuseContinueWatchingRow =
                 cache.continueWatchingRow != null &&
-                    cache.continueWatchingItems == input.continueWatchingItems &&
-                    cache.continueWatchingTitle == strContinueWatching &&
-                    cache.continueWatchingAirsDateTemplate == strAirsDate &&
-                    cache.continueWatchingUpcomingLabel == strUpcoming &&
-                    cache.continueWatchingUseLandscapePosters == input.useLandscapePosters &&
-                    cache.continueWatchingShowImdbRatings == input.showImdbRatings
+                    cache.continueWatchingItems == continueWatchingSeriesItems &&
+                    cache.continueWatchingTitle == strContinueWatchingSeries &&
+                    continueWatchingSettingsUnchanged
             val continueWatchingRow = if (reuseContinueWatchingRow) {
                 checkNotNull(cache.continueWatchingRow)
             } else {
-                HeroCarouselRow(
-                    key = MODERN_CONTINUE_WATCHING_ROW_KEY,
-                    title = strContinueWatching,
-                    globalRowIndex = -1,
-                    items = input.continueWatchingItems.map { item ->
-                        buildContinueWatchingItem(
-                            item = item,
-                            useLandscapePosters = input.useLandscapePosters,
-                            showImdbRatings = input.showImdbRatings,
-                            detailImdbRatingsVisibility = input.detailImdbRatingsVisibility,
-                            airsDateTemplate = strAirsDate,
-                            upcomingLabel = strUpcoming,
-                            context = localizedContext
-                        )
-                    }.asStable()
+                buildContinueWatchingRow(
+                    MODERN_CONTINUE_WATCHING_ROW_KEY,
+                    strContinueWatchingSeries,
+                    continueWatchingSeriesItems
                 )
             }
-            cache.continueWatchingItems = input.continueWatchingItems
-            cache.continueWatchingTitle = strContinueWatching
-            cache.continueWatchingAirsDateTemplate = strAirsDate
-            cache.continueWatchingUpcomingLabel = strUpcoming
-            cache.continueWatchingUseLandscapePosters = input.useLandscapePosters
-            cache.continueWatchingShowImdbRatings = input.showImdbRatings
+            cache.continueWatchingItems = continueWatchingSeriesItems
+            cache.continueWatchingTitle = strContinueWatchingSeries
             cache.continueWatchingRow = continueWatchingRow
             add(continueWatchingRow)
         } else {
             cache.continueWatchingItems = emptyList()
             cache.continueWatchingRow = null
         }
+
+        // Continue Watching Movies row
+        if (continueWatchingMovieItems.isNotEmpty()) {
+            val reuseMoviesRow =
+                cache.continueWatchingMoviesRow != null &&
+                    cache.continueWatchingMoviesItems == continueWatchingMovieItems &&
+                    cache.continueWatchingMoviesTitle == strContinueWatchingMovies &&
+                    continueWatchingSettingsUnchanged
+            val moviesRow = if (reuseMoviesRow) {
+                checkNotNull(cache.continueWatchingMoviesRow)
+            } else {
+                buildContinueWatchingRow(
+                    MODERN_CONTINUE_WATCHING_MOVIES_ROW_KEY,
+                    strContinueWatchingMovies,
+                    continueWatchingMovieItems
+                )
+            }
+            cache.continueWatchingMoviesItems = continueWatchingMovieItems
+            cache.continueWatchingMoviesTitle = strContinueWatchingMovies
+            cache.continueWatchingMoviesRow = moviesRow
+            add(moviesRow)
+        } else {
+            cache.continueWatchingMoviesItems = emptyList()
+            cache.continueWatchingMoviesRow = null
+        }
+
+        cache.continueWatchingAirsDateTemplate = strAirsDate
+        cache.continueWatchingUpcomingLabel = strUpcoming
+        cache.continueWatchingUseLandscapePosters = input.useLandscapePosters
+        cache.continueWatchingShowImdbRatings = input.showImdbRatings
 
         // Upcoming row (SPLIT_UPCOMING mode)
         val strUpcomingSectionTitle = localizedContext.getString(R.string.upcoming_section_title)
