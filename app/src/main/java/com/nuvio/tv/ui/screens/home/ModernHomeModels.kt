@@ -36,6 +36,7 @@ internal const val MODERN_HERO_FOCUS_DEBOUNCE_MS = 450L
 internal val MODERN_ROW_HEADER_FOCUS_INSET = 40.dp
 internal const val MODERN_CONTINUE_WATCHING_ROW_KEY = "continue_watching"
 internal const val MODERN_UPCOMING_ROW_KEY = "upcoming_section"
+internal const val MODERN_RECENTLY_WATCHED_SIMKL_ROW_KEY = "recently_watched_simkl"
 internal val MODERN_LANDSCAPE_LOGO_GRADIENT = Brush.verticalGradient(
     colorStops = arrayOf(
         0.0f to Color.Transparent,
@@ -210,6 +211,10 @@ class ModernCarouselRowBuildCache {
     var comingUpTitle: String = ""
     var comingUpUseLandscapePosters: Boolean = false
     var comingUpRow: HeroCarouselRow? = null
+    var recentlyWatchedSimklItems: List<MetaPreview> = emptyList()
+    var recentlyWatchedSimklTitle: String = ""
+    var recentlyWatchedSimklUseLandscapePosters: Boolean = false
+    var recentlyWatchedSimklRow: HeroCarouselRow? = null
     internal val catalogRows = java.util.concurrent.ConcurrentHashMap<String, ModernCatalogRowBuildCacheEntry>()
     internal val collectionRows = java.util.concurrent.ConcurrentHashMap<String, ModernCollectionRowBuildCacheEntry>()
     // per-item cache: rowKey -> (itemId -> cached carousel item + source MetaPreview)

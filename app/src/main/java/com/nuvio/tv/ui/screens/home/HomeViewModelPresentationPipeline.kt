@@ -296,6 +296,7 @@ internal fun HomeViewModel.observeModernHomePresentationPipeline() {
                         )
                     else emptyList(),
                     comingUpItems = state.comingUpItems,
+                    recentlyWatchedSimklItems = state.recentlyWatchedSimklItems,
                     useLandscapePosters = state.modernLandscapePostersEnabled,
                     showCatalogTypeSuffix = state.catalogTypeSuffixEnabled,
                     showFullReleaseDate = state.showFullReleaseDate,
