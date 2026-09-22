@@ -558,7 +558,7 @@ private fun ClassicHomeRoute(
         },
         // S4a-3b: focus-dwell stream prefetch for CW cards.
         onContinueWatchingItemFocused = remember(viewModel) {
-            { index: Int -> viewModel.onContinueWatchingItemFocused(index) }
+            { item: ContinueWatchingItem -> viewModel.onContinueWatchingItemFocused(item) }
         }
     )
 }
@@ -614,7 +614,7 @@ private fun GridHomeRoute(
         },
         // S4a-3b: focus-dwell stream prefetch for CW cards.
         onContinueWatchingItemFocused = remember(viewModel) {
-            { index: Int -> viewModel.onContinueWatchingItemFocused(index) }
+            { item: ContinueWatchingItem -> viewModel.onContinueWatchingItemFocused(item) }
         }
     )
 }
@@ -705,7 +705,9 @@ private fun ModernHomeRoute(
         onRowItemFocusedCallback = remember(viewModel) {
             { rowKey: String, index: Int, _: Boolean ->
                 if (rowKey == MODERN_CONTINUE_WATCHING_ROW_KEY) {
-                    viewModel.onContinueWatchingItemFocused(index)
+                    viewModel.onContinueWatchingSplitItemFocused(index, movies = false)
+                } else if (rowKey == MODERN_CONTINUE_WATCHING_MOVIES_ROW_KEY) {
+                    viewModel.onContinueWatchingSplitItemFocused(index, movies = true)
                 }
             }
         }

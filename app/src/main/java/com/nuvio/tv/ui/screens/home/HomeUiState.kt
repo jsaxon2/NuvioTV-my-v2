@@ -72,6 +72,7 @@ data class HomeUiState(
 
 @Immutable
 sealed class ContinueWatchingItem {
+    abstract val shufflePlayback: Boolean
     @Immutable
     data class InProgress(
         val progress: WatchProgress,
@@ -82,12 +83,27 @@ sealed class ContinueWatchingItem {
         val releaseInfo: String? = null,
         val episodeReleased: String? = null,
         val contentLanguage: String? = null,
-        //override val shufflePlayback: Boolean = false
+        override val shufflePlayback: Boolean = false
     ) : ContinueWatchingItem()
 
     @Immutable
     data class NextUp(val info: NextUpInfo) : ContinueWatchingItem()
 }
+
+/** Movies are always in-progress entries; Next Up entries are always series episodes. */
+val ContinueWatchingItem.isMovie: Boolean
+    get() = this is ContinueWatchingItem.InProgress &&
+        progress.contentType.equals("movie", ignoreCase = true)
+
+/** Continue Watching items split into (series, movies), each keeping the original order. */
+fun List<ContinueWatchingItem>.splitSeriesAndMovies(): Pair<List<ContinueWatchingItem>, List<ContinueWatchingItem>> =
+    partition { !it.isMovie }
+
+val ContinueWatchingItem.shuffleFocusKey: String?
+    get() = if (!shufflePlayback) null else when (this) {
+        is ContinueWatchingItem.InProgress -> "cw_shuffle_${progress.contentId}"
+        is ContinueWatchingItem.NextUp -> "cw_shuffle_${info.contentId}"
+    }
 
 @Immutable
 data class NextUpInfo(
