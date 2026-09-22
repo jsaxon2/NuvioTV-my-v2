@@ -1,5 +1,7 @@
 package com.nuvio.tv.ui.screens.home
 
+import com.nuvio.tv.data.simkl.SimklSyncState
+import com.nuvio.tv.data.simkl.SimklSyncRepository
 import android.content.Context
 import androidx.lifecycle.viewModelScope
 import com.nuvio.tv.data.remote.api.AddonApi
@@ -201,7 +203,10 @@ class HomeEnrichmentRepositoryBoundaryTest {
             homeRefreshSignal = mockk(relaxed = true),
             prefetchSelectionSupplier = mockk(relaxed = true),
             streamRepository = mockk(relaxed = true),
-            trailerSettingsDataStore = mockk(relaxed = true)
+            trailerSettingsDataStore = mockk(relaxed = true),
+            simklSyncRepository = mockk<SimklSyncRepository>(relaxed = true) {
+                every { state } returns MutableStateFlow(SimklSyncState())
+            }
         )
         viewModel.startupGracePeriodActive = false
         viewModel.externalMetaPrefetchEnabled = true

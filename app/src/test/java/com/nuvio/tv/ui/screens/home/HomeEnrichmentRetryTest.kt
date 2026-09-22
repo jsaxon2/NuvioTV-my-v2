@@ -1,5 +1,7 @@
 package com.nuvio.tv.ui.screens.home
 
+import com.nuvio.tv.data.simkl.SimklSyncState
+import com.nuvio.tv.data.simkl.SimklSyncRepository
 import androidx.lifecycle.viewModelScope
 import com.nuvio.tv.core.network.NetworkResult
 import com.nuvio.tv.domain.model.CatalogRow
@@ -466,7 +468,10 @@ class HomeEnrichmentRetryTest {
             homeRefreshSignal = mockk(relaxed = true),
             prefetchSelectionSupplier = mockk(relaxed = true),
             streamRepository = mockk(relaxed = true),
-            trailerSettingsDataStore = mockk(relaxed = true)
+            trailerSettingsDataStore = mockk(relaxed = true),
+            simklSyncRepository = mockk<SimklSyncRepository>(relaxed = true) {
+                every { state } returns MutableStateFlow(SimklSyncState())
+            }
         )
         // The pipeline defers everything while the startup grace period is active, and TMDB is
         // switched off so the external addon is the only enrichment source under test.
