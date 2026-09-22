@@ -140,7 +140,10 @@ class HomePosterWatchedTest {
             prefetchSelectionSupplier = mockk(relaxed = true),
             streamRepository = mockk(relaxed = true),
             trailerSettingsDataStore = mockk(relaxed = true),
-            serverCatalog = mockk { every { addons } returns flowOf(emptyList()); every { artworkUpdates } returns MutableStateFlow(0L) }
+            serverCatalog = mockk { every { addons } returns flowOf(emptyList()); every { artworkUpdates } returns MutableStateFlow(0L) },
+            simklSyncRepository = mockk<com.nuvio.tv.data.simkl.SimklSyncRepository>(relaxed = true) {
+                every { state } returns MutableStateFlow(com.nuvio.tv.data.simkl.SimklSyncState())
+            }
         )
         viewModel.startupGracePeriodActive = false
         viewModel.currentTmdbSettings = TmdbSettings(enabled = false)

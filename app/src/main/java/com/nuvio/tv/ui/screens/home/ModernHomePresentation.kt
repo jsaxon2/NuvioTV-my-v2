@@ -9,6 +9,7 @@ import com.nuvio.tv.core.image.homeRowEndsWithSeeAll
 import com.nuvio.tv.core.util.withAppLocale
 import com.nuvio.tv.domain.model.CatalogRow
 import com.nuvio.tv.domain.model.Collection
+import com.nuvio.tv.domain.model.MetaPreview
 import com.nuvio.tv.domain.model.PLACEHOLDER_IMAGE_URL
 import com.nuvio.tv.domain.model.stableItemKey
 import com.nuvio.tv.ui.util.StableList
@@ -22,6 +23,7 @@ internal data class ModernHomePresentationInput(
     val continueWatchingItems: List<ContinueWatchingItem>,
     val upcomingItems: List<ContinueWatchingItem>,
     val comingUpItems: List<ContinueWatchingItem> = emptyList(),
+    val recentlyWatchedSimklItems: List<MetaPreview> = emptyList(),
     val useLandscapePosters: Boolean,
     val showCatalogTypeSuffix: Boolean,
     val showFullReleaseDate: Boolean,
@@ -167,6 +169,56 @@ internal fun buildModernHomePresentation(
         } else {
             cache.comingUpItems = emptyList()
             cache.comingUpRow = null
+        }
+
+        // Recently Watched (Simkl) row
+        val strRecentlyWatchedSimkl = localizedContext.getString(R.string.recently_watched_simkl_title)
+        if (input.recentlyWatchedSimklItems.isNotEmpty()) {
+            val reuseRecentlyWatchedRow =
+                cache.recentlyWatchedSimklRow != null &&
+                        cache.recentlyWatchedSimklItems == input.recentlyWatchedSimklItems &&
+                        cache.recentlyWatchedSimklTitle == strRecentlyWatchedSimkl &&
+                        cache.recentlyWatchedSimklUseLandscapePosters == input.useLandscapePosters
+            val recentlyWatchedSimklRow = if (reuseRecentlyWatchedRow) {
+                checkNotNull(cache.recentlyWatchedSimklRow)
+            } else {
+                val syntheticRow = CatalogRow(
+                    addonId = "simkl_recently_watched",
+                    addonName = "Simkl",
+                    addonBaseUrl = "",
+                    catalogId = "recently_watched",
+                    catalogName = strRecentlyWatchedSimkl,
+                    type = com.nuvio.tv.domain.model.ContentType.SERIES,
+                    items = input.recentlyWatchedSimklItems,
+                    isLoading = false,
+                    hasMore = false
+                )
+                HeroCarouselRow(
+                    key = MODERN_RECENTLY_WATCHED_SIMKL_ROW_KEY,
+                    title = strRecentlyWatchedSimkl,
+                    globalRowIndex = -1,
+                    items = input.recentlyWatchedSimklItems.mapIndexed { itemIndex, item ->
+                        buildCatalogItem(
+                            item = item,
+                            row = syntheticRow,
+                            useLandscapePosters = input.useLandscapePosters,
+                            occurrence = 0,
+                            strTypeMovie = strTypeMovie,
+                            strTypeSeries = strTypeSeries,
+                            showFullReleaseDate = input.showFullReleaseDate,
+                            showImdbRatings = input.showImdbRatings
+                        ).copy(key = "${MODERN_RECENTLY_WATCHED_SIMKL_ROW_KEY}_${item.id}_$itemIndex")
+                    }.asStable()
+                )
+            }
+            cache.recentlyWatchedSimklItems = input.recentlyWatchedSimklItems
+            cache.recentlyWatchedSimklTitle = strRecentlyWatchedSimkl
+            cache.recentlyWatchedSimklUseLandscapePosters = input.useLandscapePosters
+            cache.recentlyWatchedSimklRow = recentlyWatchedSimklRow
+            add(recentlyWatchedSimklRow)
+        } else {
+            cache.recentlyWatchedSimklItems = emptyList()
+            cache.recentlyWatchedSimklRow = null
         }
 
         visibleHomeRows.forEachIndexed { index, homeRow ->

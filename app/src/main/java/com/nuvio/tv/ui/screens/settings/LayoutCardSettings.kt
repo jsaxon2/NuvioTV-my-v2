@@ -89,6 +89,7 @@ internal fun LayoutContinueWatchingSection(
 ) {
     var showSortModeDialog by rememberSaveable { mutableStateOf(false) }
     var showClickActionDialog by rememberSaveable { mutableStateOf(false) }
+    var showRecentlyWatchedSimklWindowDaysDialog by rememberSaveable { mutableStateOf(false) }
 
     SettingsToggleRow(
         title = stringResource(R.string.layout_cw_enabled),
@@ -212,6 +213,32 @@ internal fun LayoutContinueWatchingSection(
                 showClickActionDialog = false
             },
             onDismiss = { showClickActionDialog = false }
+        )
+    }
+
+    SettingsToggleRow(
+        title = stringResource(R.string.recently_watched_simkl_title),
+        subtitle = stringResource(R.string.recently_watched_simkl_sub),
+        checked = uiState.recentlyWatchedSimklEnabled,
+        onToggle = { onEvent(LayoutSettingsEvent.SetRecentlyWatchedSimklEnabled(!uiState.recentlyWatchedSimklEnabled)) }
+    )
+    if (uiState.recentlyWatchedSimklEnabled) {
+        SettingsActionRow(
+            title = stringResource(R.string.recently_watched_simkl_window_title),
+            subtitle = stringResource(R.string.recently_watched_simkl_window_sub),
+            value = stringResource(R.string.recently_watched_simkl_window_days_value, uiState.recentlyWatchedSimklWindowDays),
+            onClick = { showRecentlyWatchedSimklWindowDaysDialog = true }
+        )
+    }
+
+    if (showRecentlyWatchedSimklWindowDaysDialog) {
+        RecentlyWatchedSimklWindowDaysDialog(
+            currentDays = uiState.recentlyWatchedSimklWindowDays,
+            onDaysSelected = { days ->
+                onEvent(LayoutSettingsEvent.SetRecentlyWatchedSimklWindowDays(days))
+                showRecentlyWatchedSimklWindowDaysDialog = false
+            },
+            onDismiss = { showRecentlyWatchedSimklWindowDaysDialog = false }
         )
     }
 
@@ -588,6 +615,30 @@ private fun ContinueWatchingClickActionDialog(
         options = options,
         selectedValue = currentAction,
         onOptionSelected = onActionSelected,
+        onDismiss = onDismiss,
+        width = 420.dp,
+        maxHeight = 320.dp
+    )
+}
+
+@Composable
+private fun RecentlyWatchedSimklWindowDaysDialog(
+    currentDays: Int,
+    onDaysSelected: (Int) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val options = listOf(14, 30, 60, 90).map { days ->
+        SettingsPickerOption(
+            days,
+            stringResource(R.string.recently_watched_simkl_window_days_value, days)
+        )
+    }
+
+    SettingsSingleChoiceDialog(
+        title = stringResource(R.string.recently_watched_simkl_window_title),
+        options = options,
+        selectedValue = currentDays,
+        onOptionSelected = onDaysSelected,
         onDismiss = onDismiss,
         width = 420.dp,
         maxHeight = 320.dp

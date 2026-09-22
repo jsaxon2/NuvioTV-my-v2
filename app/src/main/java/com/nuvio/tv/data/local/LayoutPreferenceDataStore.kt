@@ -120,6 +120,8 @@ class LayoutPreferenceDataStore @Inject constructor(
     private val cardDepthTrailersEnabledKey = booleanPreferencesKey("card_depth_trailers_enabled")
     private val blurUnwatchedEpisodesKey = booleanPreferencesKey("blur_unwatched_episodes")
     private val randomEpisodeEnabledKey = booleanPreferencesKey("random_episode_enabled")
+    private val recentlyWatchedSimklEnabledKey = booleanPreferencesKey("recently_watched_simkl_enabled")
+    private val recentlyWatchedSimklWindowDaysKey = intPreferencesKey("recently_watched_simkl_window_days")
     private val startupSplashEnabledKey = booleanPreferencesKey("startup_splash_enabled")
     private val alwaysShowLandscapeClearlogoKey = booleanPreferencesKey("always_show_landscape_clearlogo")
     private val addonLandscapeBackdropLogoKey = booleanPreferencesKey("addon_landscape_backdrop_logo")
@@ -371,6 +373,14 @@ class LayoutPreferenceDataStore @Inject constructor(
 
     val randomEpisodeEnabled: Flow<Boolean> = profileFlow { prefs ->
         prefs[randomEpisodeEnabledKey] ?: false
+    }
+
+    val recentlyWatchedSimklEnabled: Flow<Boolean> = profileFlow { prefs ->
+        prefs[recentlyWatchedSimklEnabledKey] ?: false
+    }
+
+    val recentlyWatchedSimklWindowDays: Flow<Int> = profileFlow { prefs ->
+        prefs[recentlyWatchedSimklWindowDaysKey] ?: 30
     }
 
     fun randomEpisodeEnabledForProfile(profileId: Int): Flow<Boolean> =
@@ -831,6 +841,18 @@ class LayoutPreferenceDataStore @Inject constructor(
     suspend fun setRandomEpisodeEnabled(enabled: Boolean) {
         store().edit { prefs ->
             prefs[randomEpisodeEnabledKey] = enabled
+        }
+    }
+
+    suspend fun setRecentlyWatchedSimklEnabled(enabled: Boolean) {
+        store().edit { prefs ->
+            prefs[recentlyWatchedSimklEnabledKey] = enabled
+        }
+    }
+
+    suspend fun setRecentlyWatchedSimklWindowDays(days: Int) {
+        store().edit { prefs ->
+            prefs[recentlyWatchedSimklWindowDaysKey] = days
         }
     }
 
