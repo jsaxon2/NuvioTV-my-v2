@@ -265,11 +265,12 @@ internal fun HomeViewModel.observeLayoutPreferencesPipeline() {
 internal fun HomeViewModel.observeModernHomePresentationPipeline() {
     viewModelScope.launch {
         combine(uiState, _currentLocaleTag) { state, localeTag ->
-                ModernHomePresentationInput(
+            ModernHomePresentationInput(
                     homeRows = state.homeRows,
                     catalogRows = state.catalogRows,
                     continueWatchingItems = if (state.continueWatchingEnabled) state.continueWatchingItems else emptyList(),
                     upcomingItems = if (state.continueWatchingEnabled) state.upcomingItems else emptyList(),
+                    recentlyWatchedSimklItems = state.recentlyWatchedSimklItems,
                     useLandscapePosters = state.modernLandscapePostersEnabled,
                     showCatalogTypeSuffix = state.catalogTypeSuffixEnabled,
                     showFullReleaseDate = state.showFullReleaseDate,
@@ -285,6 +286,7 @@ internal fun HomeViewModel.observeModernHomePresentationPipeline() {
                 old.homeRows === new.homeRows
                     && old.continueWatchingItems == new.continueWatchingItems
                     && old.upcomingItems == new.upcomingItems
+                    && old.recentlyWatchedSimklItems == new.recentlyWatchedSimklItems
                     && old.useLandscapePosters == new.useLandscapePosters
                     && old.showCatalogTypeSuffix == new.showCatalogTypeSuffix
                     && old.showFullReleaseDate == new.showFullReleaseDate

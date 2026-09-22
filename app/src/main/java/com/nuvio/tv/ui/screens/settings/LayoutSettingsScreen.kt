@@ -138,6 +138,7 @@ fun LayoutSettingsContent(
     var posterCardStyleExpanded by rememberSaveable { mutableStateOf(false) }
     var showCardDepthFineTuneDialog by rememberSaveable { mutableStateOf(false) }
     var showCwSortModeDialog by rememberSaveable { mutableStateOf(false) }
+    var showRecentlyWatchedSimklWindowDaysDialog by rememberSaveable { mutableStateOf(false) }
     var showStreamBadgePositionDialog by rememberSaveable { mutableStateOf(false) }
     var showEpisodeRatingsDialog by rememberSaveable { mutableStateOf(false) }
     var showEpisodeOptionsOverlayStyleDialog by rememberSaveable { mutableStateOf(false) }
@@ -478,6 +479,18 @@ fun LayoutSettingsContent(
                     // so the knob would be a no-op. Plumbing kept for merge parity.
 
                     CompactToggleRow(
+                        title = stringResource(R.string.random_episode_title),
+                        subtitle = stringResource(R.string.layout_random_episode_sub),
+                        checked = uiState.randomEpisodeEnabled,
+                        onToggle = {
+                            viewModel.onEvent(
+                                LayoutSettingsEvent.SetRandomEpisodeEnabled(!uiState.randomEpisodeEnabled)
+                            )
+                        },
+                        onFocused = { focusedSection = LayoutSettingsSection.DETAIL_PAGE }
+                    )
+
+                    CompactToggleRow(
                         title = stringResource(R.string.layout_blur_unwatched),
                         subtitle = stringResource(R.string.layout_blur_unwatched_sub),
                         checked = uiState.blurUnwatchedEpisodes,
@@ -771,6 +784,26 @@ fun LayoutSettingsContent(
                         onFocused = { focusedSection = LayoutSettingsSection.CONTINUE_WATCHING }
                     )
                     } // end if (uiState.continueWatchingEnabled)
+
+                    CompactToggleRow(
+                        title = stringResource(R.string.recently_watched_simkl_title),
+                        subtitle = stringResource(R.string.recently_watched_simkl_sub),
+                        checked = uiState.recentlyWatchedSimklEnabled,
+                        onToggle = {
+                            viewModel.onEvent(
+                                LayoutSettingsEvent.SetRecentlyWatchedSimklEnabled(!uiState.recentlyWatchedSimklEnabled)
+                            )
+                        },
+                        onFocused = { focusedSection = LayoutSettingsSection.DETAIL_PAGE }
+                    )
+
+                    SettingsActionRow(
+                        title = stringResource(R.string.recently_watched_simkl_window_title),
+                        subtitle = stringResource(R.string.recently_watched_simkl_window_sub),
+                        value = stringResource(R.string.recently_watched_simkl_window_days_value, uiState.recentlyWatchedSimklWindowDays),
+                        onClick = { showRecentlyWatchedSimklWindowDaysDialog = true },
+                        onFocused = { focusedSection = LayoutSettingsSection.DETAIL_PAGE }
+                    )
                 }
             }
 
@@ -955,6 +988,16 @@ fun LayoutSettingsContent(
                     showCwSortModeDialog = false
                 },
                 onDismiss = { showCwSortModeDialog = false }
+            )
+        }
+        if (showRecentlyWatchedSimklWindowDaysDialog) {
+            RecentlyWatchedSimklWindowDaysDialog(
+                currentDays = uiState.recentlyWatchedSimklWindowDays,
+                onDaysSelected = { days ->
+                    viewModel.onEvent(LayoutSettingsEvent.SetRecentlyWatchedSimklWindowDays(days))
+                    showRecentlyWatchedSimklWindowDaysDialog = false
+                },
+                onDismiss = { showRecentlyWatchedSimklWindowDaysDialog = false }
             )
         }
 
@@ -1164,6 +1207,30 @@ private fun EpisodeOptionsOverlayStyleDialog(
         onDismiss = onDismiss,
         width = 460.dp,
         maxHeight = 380.dp
+    )
+}
+
+@Composable
+private fun RecentlyWatchedSimklWindowDaysDialog(
+    currentDays: Int,
+    onDaysSelected: (Int) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val options = listOf(14, 30, 60, 90).map { days ->
+        SettingsPickerOption(
+            days,
+            stringResource(R.string.recently_watched_simkl_window_days_value, days)
+        )
+    }
+
+    SettingsSingleChoiceDialog(
+        title = stringResource(R.string.recently_watched_simkl_window_title),
+        options = options,
+        selectedValue = currentDays,
+        onOptionSelected = onDaysSelected,
+        onDismiss = onDismiss,
+        width = 420.dp,
+        maxHeight = 320.dp
     )
 }
 

@@ -12,8 +12,11 @@ import com.nuvio.tv.core.player.StreamAutoPlayPolicy
 import com.nuvio.tv.core.recommendations.TvRecommendationManager
 import com.nuvio.tv.core.tmdb.TmdbMetadataService
 import com.nuvio.tv.core.tmdb.TmdbService
+import com.nuvio.tv.core.tracking.TrackingRefreshIntent
 import com.nuvio.tv.data.local.AuthSessionNoticeDataStore
 import com.nuvio.tv.data.local.CollectionsDataStore
+import com.nuvio.tv.data.simkl.recentlyWatchedPreviews
+import kotlinx.coroutines.flow.onStart
 import com.nuvio.tv.data.local.LayoutPreferenceDataStore
 import com.nuvio.tv.data.local.PlayerSettingsDataStore
 import com.nuvio.tv.data.local.StartupAuthNotice
@@ -74,8 +77,9 @@ class HomeViewModel @Inject constructor(
     internal val metaRepository: MetaRepository,
     internal val collectionsDataStore: CollectionsDataStore,
     internal val layoutPreferenceDataStore: LayoutPreferenceDataStore,
-    internal val playerSettingsDataStore: PlayerSettingsDataStore,
-    internal val tmdbSettingsDataStore: TmdbSettingsDataStore,
+
+    internal val simklSyncRepository: com.nuvio.tv.data.simkl.SimklSyncRepository,
+    internal val playerSettingsDataStore: PlayerSettingsDataStore,internal val tmdbSettingsDataStore: TmdbSettingsDataStore,
     internal val mdbListSettingsDataStore: MDBListSettingsDataStore,
     internal val traktSettingsDataStore: TraktSettingsDataStore,
     internal val authSessionNoticeDataStore: AuthSessionNoticeDataStore,
@@ -504,6 +508,7 @@ class HomeViewModel @Inject constructor(
             observeTmdbSettings()
             observeMdbListSettings()
             observeBlurUnwatchedEpisodes()
+            observeRecentlyWatchedSimkl()
             observeProgressSourceChanges()
             observeCollections()
             observeInstalledAddons()
@@ -636,6 +641,31 @@ class HomeViewModel @Inject constructor(
                     }
                     // Clear caches so the new sort is applied immediately on next pipeline run
                     clearAllCwInMemoryCaches()
+                }
+        }
+    }
+
+    private fun observeRecentlyWatchedSimkl() {
+        viewModelScope.launch {
+            kotlinx.coroutines.flow.combine(
+                layoutPreferenceDataStore.recentlyWatchedSimklEnabled,
+                layoutPreferenceDataStore.recentlyWatchedSimklWindowDays,
+                simklSyncRepository.state.onStart {
+                    simklSyncRepository.refresh(TrackingRefreshIntent.AUTOMATIC)
+                }
+            ) { enabled, windowDays, syncState ->
+                if (!enabled) {
+                    emptyList()
+                } else {
+                    syncState.snapshot.recentlyWatchedPreviews(
+                        windowDays = windowDays,
+                        nowEpochMs = System.currentTimeMillis()
+                    )
+                }
+            }
+                .distinctUntilChanged()
+                .collect { items ->
+                    _uiState.update { it.copy(recentlyWatchedSimklItems = items) }
                 }
         }
     }

@@ -102,6 +102,9 @@ class LayoutPreferenceDataStore @Inject constructor(
     private val cardDepthCastEnabledKey = booleanPreferencesKey("card_depth_cast_enabled")
     private val cardDepthTrailersEnabledKey = booleanPreferencesKey("card_depth_trailers_enabled")
     private val blurUnwatchedEpisodesKey = booleanPreferencesKey("blur_unwatched_episodes")
+    private val randomEpisodeEnabledKey = booleanPreferencesKey("random_episode_enabled")
+    private val recentlyWatchedSimklEnabledKey = booleanPreferencesKey("recently_watched_simkl_enabled")
+    private val recentlyWatchedSimklWindowDaysKey = intPreferencesKey("recently_watched_simkl_window_days")
     private val episodeOptionsOverlayStyleKey = stringPreferencesKey("episode_options_overlay_style")
     private val homeImdbRatingsVisibilityKey = stringPreferencesKey("home_imdb_ratings_visibility")
     private val detailImdbRatingsVisibilityKey = stringPreferencesKey("detail_imdb_ratings_visibility")
@@ -329,6 +332,21 @@ class LayoutPreferenceDataStore @Inject constructor(
 
     val blurUnwatchedEpisodes: Flow<Boolean> = profileFlow { prefs ->
         prefs[blurUnwatchedEpisodesKey] ?: false
+    }
+
+    val randomEpisodeEnabled: Flow<Boolean> = profileFlow { prefs ->
+        prefs[randomEpisodeEnabledKey] ?: false
+    }
+
+    fun randomEpisodeEnabledForProfile(profileId: Int): Flow<Boolean> =
+        factory.get(profileId, FEATURE).data.map { it[randomEpisodeEnabledKey] ?: false }
+
+    val recentlyWatchedSimklEnabled: Flow<Boolean> = profileFlow { prefs ->
+        prefs[recentlyWatchedSimklEnabledKey] ?: false
+    }
+
+    val recentlyWatchedSimklWindowDays: Flow<Int> = profileFlow { prefs ->
+        prefs[recentlyWatchedSimklWindowDaysKey] ?: 30
     }
 
     val episodeOptionsOverlayStyle: Flow<EpisodeOptionsOverlayStyle> = profileFlow { prefs ->
@@ -689,17 +707,34 @@ class LayoutPreferenceDataStore @Inject constructor(
         }
     }
 
-    suspend fun setEpisodeOptionsOverlayStyle(style: EpisodeOptionsOverlayStyle) {
-        store().edit { prefs ->
-            prefs[episodeOptionsOverlayStyleKey] = style.name
+        suspend fun setRandomEpisodeEnabled(enabled: Boolean) {
+            store().edit { prefs ->
+                prefs[randomEpisodeEnabledKey] = enabled
+            }
         }
-    }
 
-    suspend fun setHomeImdbRatingsVisibility(visibility: HomeImdbRatingsVisibility) {
-        store().edit { prefs ->
-            prefs[homeImdbRatingsVisibilityKey] = visibility.name
+        suspend fun setRecentlyWatchedSimklEnabled(enabled: Boolean) {
+            store().edit { prefs ->
+                prefs[recentlyWatchedSimklEnabledKey] = enabled
+            }
         }
-    }
+
+        suspend fun setRecentlyWatchedSimklWindowDays(days: Int) {
+            store().edit { prefs ->
+                prefs[recentlyWatchedSimklWindowDaysKey] = days
+            }
+        }
+
+        suspend fun setEpisodeOptionsOverlayStyle(style: EpisodeOptionsOverlayStyle) {
+            store().edit { prefs ->
+                prefs[episodeOptionsOverlayStyleKey] = style.name
+            }
+        }
+        suspend fun setHomeImdbRatingsVisibility(visibility: HomeImdbRatingsVisibility) {
+            store().edit { prefs ->
+                prefs[homeImdbRatingsVisibilityKey] = visibility.name
+            }
+        }
 
     suspend fun setDetailImdbRatingsVisibility(visibility: DetailImdbRatingsVisibility) {
         store().edit { prefs ->

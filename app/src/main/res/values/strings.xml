@@ -138,6 +138,7 @@
 
     <string name="continue_watching">Continue Watching</string>
     <string name="cw_upcoming">Upcoming</string>
+    <string name="upcoming_section_title">Upcoming</string>
     <string name="cw_next_up">Next Up</string>
     <string name="cw_next_up_short">Next</string>
     <string name="cw_new_episode">New Episode</string>
@@ -1089,7 +1090,12 @@
     <string name="layout_cw_sort_split_upcoming">Separate Upcoming Row</string>
     <string name="layout_cw_sort_split_upcoming_desc">Move unaired episodes to a separate Upcoming row</string>
     <string name="layout_cw_sort_last_aired">Last Aired</string>
-    <string name="layout_cw_sort_last_aired_desc">Show the most recently aired episodes first</string><string name="upcoming_section_title">Upcoming</string>
+    <string name="layout_cw_sort_last_aired_desc">Show the most recently aired episodes first</string>
+    <string name="recently_watched_simkl_title">Recently Watched</string>
+    <string name="recently_watched_simkl_sub">Show a row of shows and movies recently watched on Simkl</string>
+    <string name="recently_watched_simkl_window_title">Recently Watched Window</string>
+    <string name="recently_watched_simkl_window_sub">How far back to look for recently watched titles</string>
+    <string name="recently_watched_simkl_window_days_value">%1$d days</string>
     <string name="layout_trailer_button">Show Trailer Button</string>
     <string name="layout_trailer_button_sub">Show trailer button on detail page (only when trailer is available).</string>
     <string name="layout_prefer_external_meta">Prefer meta from external addon</string>
