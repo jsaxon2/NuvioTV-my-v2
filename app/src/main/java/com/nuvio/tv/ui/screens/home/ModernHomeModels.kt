@@ -56,6 +56,7 @@ internal fun modernRowsViewportHeight(screenHeight: Dp, fraction: Float, tallest
 internal fun modernHeroTextMaxHeight(screenHeight: Dp, rowsViewportHeight: Dp): Dp =
     (screenHeight - rowsViewportHeight - NuvioSpacing.tokens.lg - NuvioSpacing.tokens.xs).coerceAtLeast(0.dp)
 internal const val MODERN_CONTINUE_WATCHING_ROW_KEY = "continue_watching"
+internal const val MODERN_CONTINUE_WATCHING_MOVIES_ROW_KEY = "continue_watching_movies"
 internal const val MODERN_UPCOMING_ROW_KEY = "upcoming_section"
 internal const val MODERN_LANDSCAPE_LOGO_SHADE_START = 0.58f
 internal val MODERN_LANDSCAPE_LOGO_SHADE_END = Color.Black.copy(alpha = 0.75f)
@@ -236,6 +237,9 @@ class ModernCarouselRowBuildCache {
     var continueWatchingUseLandscapePosters: Boolean = false
     var continueWatchingShowImdbRatings: Boolean = true
     var continueWatchingRow: HeroCarouselRow? = null
+    var continueWatchingMoviesItems: List<ContinueWatchingItem> = emptyList()
+    var continueWatchingMoviesTitle: String = ""
+    var continueWatchingMoviesRow: HeroCarouselRow? = null
     var upcomingItems: List<ContinueWatchingItem> = emptyList()
     var upcomingTitle: String = ""
     var upcomingUseLandscapePosters: Boolean = false
