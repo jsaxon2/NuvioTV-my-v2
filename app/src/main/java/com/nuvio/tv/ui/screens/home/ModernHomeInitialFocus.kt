@@ -9,7 +9,8 @@ internal fun resolveModernHomeInitialFocus(
     if (!saved.hasSavedFocus) return rows.first() to 0
     val row = rows.firstOrNull {
         if (saved.focusedRowKey != null) it.key == saved.focusedRowKey
-        else if (saved.focusedRowIndex == -1) it.key == MODERN_CONTINUE_WATCHING_ROW_KEY
+        else if (saved.focusedRowIndex == -1) it.key == MODERN_CONTINUE_WATCHING_ROW_KEY ||
+            it.key == MODERN_CONTINUE_WATCHING_MOVIES_ROW_KEY
         else it.globalRowIndex == saved.focusedRowIndex
     } ?: rows.first()
     val itemKey = saved.focusedItemKeyByRow[row.key]

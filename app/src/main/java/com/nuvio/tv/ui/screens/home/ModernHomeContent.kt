@@ -1277,9 +1277,15 @@ fun ModernHomeContent(
             item = selectedOptionsItem,
             onDismiss = { optionsItem.value = null },
             onRemove = {
-                val targetIndex = if (uiState.continueWatchingItems.size <= 1) null
-                else (lastFocusedContinueWatchingIndex.intValue).coerceAtMost(uiState.continueWatchingItems.size - 2).coerceAtLeast(0)
-                pendingRowFocusKey.value = if (targetIndex != null) "continue_watching" else null
+                val removedFromMovies = selectedOptionsItem.isMovie
+                val rowItemCount = uiState.continueWatchingItems.count { it.isMovie == removedFromMovies }
+                val targetIndex = if (rowItemCount <= 1) null
+                else (lastFocusedContinueWatchingIndex.intValue).coerceAtMost(rowItemCount - 2).coerceAtLeast(0)
+                pendingRowFocusKey.value = when {
+                    targetIndex == null -> null
+                    removedFromMovies -> MODERN_CONTINUE_WATCHING_MOVIES_ROW_KEY
+                    else -> MODERN_CONTINUE_WATCHING_ROW_KEY
+                }
                 pendingRowFocusIndex.value = targetIndex
                 pendingRowFocusNonce.intValue++
                 onRemoveContinueWatching(

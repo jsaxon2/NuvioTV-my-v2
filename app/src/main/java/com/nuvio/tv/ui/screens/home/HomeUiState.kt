@@ -104,6 +104,15 @@ sealed class ContinueWatchingItem {
     ) : ContinueWatchingItem()
 }
 
+/** Movies are always in-progress entries; Next Up entries are always series episodes. */
+val ContinueWatchingItem.isMovie: Boolean
+    get() = this is ContinueWatchingItem.InProgress &&
+        progress.contentType.equals("movie", ignoreCase = true)
+
+/** Continue Watching items split into (series, movies), each keeping the original order. */
+fun List<ContinueWatchingItem>.splitSeriesAndMovies(): Pair<List<ContinueWatchingItem>, List<ContinueWatchingItem>> =
+    partition { !it.isMovie }
+
 val ContinueWatchingItem.shuffleFocusKey: String?
     get() = if (!shufflePlayback) null else when (this) {
         is ContinueWatchingItem.InProgress -> "cw_shuffle_${progress.contentId}"
