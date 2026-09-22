@@ -295,6 +295,7 @@ internal fun HomeViewModel.observeModernHomePresentationPipeline() {
                             com.nuvio.tv.core.poster.patternForScreen(state.customPosterUrlPattern, com.nuvio.tv.core.poster.CustomPosterScreen.CONTINUE_WATCHING, state.customPosterEnabledScreens)
                         )
                     else emptyList(),
+                    recentlyWatchedSimklItems = state.recentlyWatchedSimklItems,
                     useLandscapePosters = state.modernLandscapePostersEnabled,
                     showCatalogTypeSuffix = state.catalogTypeSuffixEnabled,
                     showFullReleaseDate = state.showFullReleaseDate,
