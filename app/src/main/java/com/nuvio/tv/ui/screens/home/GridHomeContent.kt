@@ -110,8 +110,8 @@ fun GridHomeContent(
     onContinueWatchingStartFromBeginning: (ContinueWatchingItem) -> Unit = {},
     onContinueWatchingPlayManually: (ContinueWatchingItem) -> Unit = {},
     showContinueWatchingManualPlayOption: Boolean = false,
-    /** CW card focus, indexed into uiState.continueWatchingItems. */
-    onContinueWatchingItemFocused: (Int) -> Unit = {},
+    /** S4a-3b: CW card focus (Series or Movies row). */
+    onContinueWatchingItemFocused: (ContinueWatchingItem) -> Unit = {},
     onNavigateToCatalogSeeAll: (String, String, String) -> Unit,
     onNavigateToFolderDetail: (String, String) -> Unit = { _, _ -> },
     onRemoveContinueWatching: (String, Int?, Int?, Boolean) -> Unit,
@@ -136,10 +136,14 @@ fun GridHomeContent(
     // returning. The restorer falls back to the first card when the remembered one is
     // off screen, so the scroll has to survive too, not just the index.
     val lastFocusedCwIndex = rememberSaveable { mutableIntStateOf(-1) }
+    val lastFocusedCwMoviesIndex = rememberSaveable { mutableIntStateOf(-1) }
     val lastFocusedUpcomingIndex = rememberSaveable { mutableIntStateOf(-1) }
     val cwFocusRequesters = remember { mutableMapOf<Int, FocusRequester>() }
     val upcomingFocusRequesters = remember { mutableMapOf<Int, FocusRequester>() }
     val cwRowFocusRequester = remember { FocusRequester() }
+    val cwMoviesFocusRequesters = remember { mutableMapOf<Int, FocusRequester>() }
+    val cwMoviesRowFocusRequester = remember { FocusRequester() }
+    val cwMoviesListState = androidx.compose.foundation.lazy.rememberLazyListState()
     val upcomingRowFocusRequester = remember { FocusRequester() }
     val cwListState = androidx.compose.foundation.lazy.rememberLazyListState()
     val upcomingListState = androidx.compose.foundation.lazy.rememberLazyListState()
@@ -152,6 +156,7 @@ fun GridHomeContent(
     val contentHasFocus = remember { mutableStateOf(false) }
     val activeCwRowKey = remember { mutableStateOf<String?>(null) }
     val cwPendingScrollToStart = remember { mutableIntStateOf(0) }
+    val cwMoviesPendingScrollToStart = remember { mutableIntStateOf(0) }
     val upcomingPendingScrollToStart = remember { mutableIntStateOf(0) }
     val comingUpPendingScrollToStart = remember { mutableIntStateOf(0) }
     BackHandler(enabled = contentHasFocus.value && run {
@@ -159,6 +164,7 @@ fun GridHomeContent(
         val idx = when (key) {
             "continue_watching" -> lastFocusedCwIndex.intValue
             MODERN_COMING_UP_ROW_KEY -> lastFocusedComingUpIndex.intValue
+            "continue_watching_movies" -> lastFocusedCwMoviesIndex.intValue
             else -> lastFocusedUpcomingIndex.intValue
         }
         idx > 0
@@ -168,6 +174,10 @@ fun GridHomeContent(
             "continue_watching" -> {
                 lastFocusedCwIndex.intValue = 0
                 cwPendingScrollToStart.intValue++
+            }
+            "continue_watching_movies" -> {
+                lastFocusedCwMoviesIndex.intValue = 0
+                cwMoviesPendingScrollToStart.intValue++
             }
             MODERN_COMING_UP_ROW_KEY -> {
                 lastFocusedComingUpIndex.intValue = 0
@@ -234,7 +244,12 @@ fun GridHomeContent(
             emptyList()
         }
     }
-    val continueWatchingOffset = if (continueWatchingItems.isNotEmpty()) 1 else 0
+    val (continueWatchingSeriesItems, continueWatchingMovieItems) = remember(continueWatchingItems) {
+        continueWatchingItems.splitSeriesAndMovies()
+    }
+    val continueWatchingOffset =
+        (if (continueWatchingSeriesItems.isNotEmpty()) 1 else 0) +
+            (if (continueWatchingMovieItems.isNotEmpty()) 1 else 0)
 
     LaunchedEffect(gridItems, gridFocusState.hasSavedFocus, gridFocusState.focusedItemKey) {
         // Restore once per screen entry, not again when background catalog loads finish.
@@ -462,6 +477,7 @@ fun GridHomeContent(
                     val cwRow = activeCwRowKey.value
                     val fromCwRow = when (cwRow) {
                         "continue_watching" -> cwRowFocusRequester
+                        "continue_watching_movies" -> cwMoviesRowFocusRequester
                         "upcoming_section" -> upcomingRowFocusRequester
                         MODERN_COMING_UP_ROW_KEY -> comingUpRowFocusRequester
                         else -> null
@@ -541,8 +557,8 @@ fun GridHomeContent(
                 }
             }
 
-            // Emit Continue Watching as a dedicated item
-            if (continueWatchingItems.isNotEmpty()) {
+            // Emit Continue Watching Series as a dedicated item
+            if (continueWatchingSeriesItems.isNotEmpty()) {
                 item(
                     key = "continue_watching",
                     span = { GridItemSpan(maxLineSpan) },
@@ -558,7 +574,8 @@ fun GridHomeContent(
                     GridContinueWatchingSection(
                         modifier = Modifier.fillMaxWidth(),
                         fullWidth = gridWidth,
-                        items = continueWatchingItems,
+                        items = continueWatchingSeriesItems,
+                        title = stringResource(R.string.continue_watching_series),
                         focusedItemIndex = if (shouldRequestInitialFocus && !hasHero) 0 else -1,
                         lastFocusedIndex = lastFocusedCwIndex,
                         focusRequesters = cwFocusRequesters,
@@ -567,7 +584,77 @@ fun GridHomeContent(
                         onItemFocused = {
                             lastFocusedCwIndex.intValue = it
                             activeCwRowKey.value = "continue_watching"
-                            onContinueWatchingItemFocused(it)
+                            continueWatchingSeriesItems.getOrNull(it)?.let(onContinueWatchingItemFocused)
+                        },
+                        onItemClick = onContinueWatchingClick,
+                        onStartFromBeginning = onContinueWatchingStartFromBeginning,
+                        showManualPlayOption = showContinueWatchingManualPlayOption,
+                        onPlayManually = onContinueWatchingPlayManually,
+                        onDetailsClick = { item ->
+                            onNavigateToDetail(
+                                when (item) {
+                                    is ContinueWatchingItem.InProgress -> item.progress.contentId
+                                    is ContinueWatchingItem.NextUp -> item.info.contentId
+                                },
+                                when (item) {
+                                    is ContinueWatchingItem.InProgress -> item.progress.contentType
+                                    is ContinueWatchingItem.NextUp -> item.info.contentType
+                                },
+                                ""
+                            )
+                        },
+                        onRemoveItem = { item ->
+                            val contentId = when (item) {
+                                is ContinueWatchingItem.InProgress -> item.progress.contentId
+                                is ContinueWatchingItem.NextUp -> item.info.contentId
+                            }
+                            val season = when (item) {
+                                is ContinueWatchingItem.InProgress -> item.progress.season
+                                is ContinueWatchingItem.NextUp -> item.info.seedSeason
+                            }
+                            val episode = when (item) {
+                                is ContinueWatchingItem.InProgress -> item.progress.episode
+                                is ContinueWatchingItem.NextUp -> item.info.seedEpisode
+                            }
+                            val isNextUp = item is ContinueWatchingItem.NextUp
+                            onRemoveContinueWatching(contentId, season, episode, isNextUp)
+                        },
+                        blurUnwatchedEpisodes = uiState.blurUnwatchedEpisodes,
+                        useEpisodeThumbnails = uiState.useEpisodeThumbnailsInCw,
+                        cardStyle = uiState.continueWatchingCardStyle,
+                        cornerRadius = posterCardStyle.cornerRadius
+                    )
+                }
+            }
+
+            // Emit Continue Watching Movies as a dedicated item
+            if (continueWatchingMovieItems.isNotEmpty()) {
+                item(
+                    key = "continue_watching_movies",
+                    span = { GridItemSpan(maxLineSpan) },
+                    contentType = "continue_watching_movies"
+                ) {
+                    LaunchedEffect(cwMoviesPendingScrollToStart.intValue) {
+                        if (cwMoviesPendingScrollToStart.intValue > 0) {
+                            cwMoviesListState.scrollToItem(0, 0)
+                            cwMoviesRowFocusRequester.let { runCatching { it.requestFocus() } }
+                            cwMoviesPendingScrollToStart.intValue = 0
+                        }
+                    }
+                    GridContinueWatchingSection(
+                        modifier = Modifier.fillMaxWidth(),
+                        fullWidth = gridWidth,
+                        items = continueWatchingMovieItems,
+                        title = stringResource(R.string.continue_watching_movies),
+                        focusedItemIndex = if (shouldRequestInitialFocus && !hasHero && continueWatchingSeriesItems.isEmpty()) 0 else -1,
+                        lastFocusedIndex = lastFocusedCwMoviesIndex,
+                        focusRequesters = cwMoviesFocusRequesters,
+                        rowFocusRequester = cwMoviesRowFocusRequester,
+                        listState = cwMoviesListState,
+                        onItemFocused = {
+                            lastFocusedCwMoviesIndex.intValue = it
+                            activeCwRowKey.value = "continue_watching_movies"
+                            continueWatchingMovieItems.getOrNull(it)?.let(onContinueWatchingItemFocused)
                         },
                         onItemClick = onContinueWatchingClick,
                         onStartFromBeginning = onContinueWatchingStartFromBeginning,
