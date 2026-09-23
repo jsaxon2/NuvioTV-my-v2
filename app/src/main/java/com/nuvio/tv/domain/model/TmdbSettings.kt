@@ -27,5 +27,7 @@ data class TmdbSettings(
     // Group: Recommendations (more like this)
     val useMoreLikeThis: Boolean = true,
     // Group: Collections
-    val useCollections: Boolean = true
+    val useCollections: Boolean = true,
+    // Group: Reviews (replace Trakt reviews on metadata pages)
+    val useReviews: Boolean = false
 )

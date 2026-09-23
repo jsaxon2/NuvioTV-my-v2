@@ -665,6 +665,7 @@ fun MetaDetailsScreen(
                     commentsError = uiState.commentsError,
                     shouldShowCommentsSection = uiState.shouldShowCommentsSection,
                     commentsMode = uiState.commentsMode,
+                    commentsSource = uiState.commentsSource,
                     commentsEpisodeTarget = uiState.commentsEpisodeTarget,
                     selectedComment = uiState.selectedComment,
                     onSeasonSelected = { viewModel.onEvent(MetaDetailsEvent.OnSeasonSelected(it)) },
@@ -982,6 +983,7 @@ private fun MetaDetailsContent(
     commentsError: String?,
     shouldShowCommentsSection: Boolean,
     commentsMode: CommentsMode,
+    commentsSource: CommentsSource,
     commentsEpisodeTarget: Video?,
     selectedComment: TraktCommentReview?,
     onSeasonSelected: (Int) -> Unit,
@@ -1506,7 +1508,9 @@ private fun MetaDetailsContent(
         isSeries -> seasonDownFocusRequester ?: heroPlayFocusRequester
         else -> heroPlayFocusRequester
     }
-    val canToggleEpisodeComments = isSeries && episodesForSeason.isNotEmpty()
+    // TMDB has no per-episode reviews, so the Show/Episode toggle is Trakt-only.
+    val canToggleEpisodeComments =
+        isSeries && episodesForSeason.isNotEmpty() && commentsSource == CommentsSource.TRAKT
     val commentsSelectedModeFocusRequester =
         if (commentsMode == CommentsMode.EPISODE) commentsEpisodeModeFocusRequester else commentsTitleModeFocusRequester
 
@@ -1896,7 +1900,7 @@ private fun MetaDetailsContent(
                             isSeasonFullyWatched = isSeasonFullyWatched(selectedSeason),
                             selectedSeason = selectedSeason,
                             onOpenEpisodeComments = episodeCommentsClick,
-                            showOpenEpisodeComments = shouldShowCommentsSection,
+                            showOpenEpisodeComments = shouldShowCommentsSection && commentsSource == CommentsSource.TRAKT,
                             onMarkPreviousEpisodesWatched = onMarkPreviousEpisodesWatched,
                             upFocusRequester = if (showSeasonTabs) selectedSeasonFocusRequester else heroPlayFocusRequester,
                             downFocusRequester = episodesDownFocusRequester,
@@ -2122,6 +2126,7 @@ private fun MetaDetailsContent(
                     CommentsSection(
                         comments = comments,
                         commentsMode = commentsMode,
+                        commentsSource = commentsSource,
                         canToggleEpisodeComments = canToggleEpisodeComments,
                         titleModeFocusRequester = commentsTitleModeFocusRequester,
                         episodeModeFocusRequester = commentsEpisodeModeFocusRequester,

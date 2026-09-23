@@ -47,6 +47,7 @@ class TmdbSettingsDataStore @Inject constructor(
     private val useTrailersKey = booleanPreferencesKey("tmdb_use_trailers")
     private val useMoreLikeThisKey = booleanPreferencesKey("tmdb_use_more_like_this")
     private val useCollectionsKey = booleanPreferencesKey("tmdb_use_collections")
+    private val useReviewsKey = booleanPreferencesKey("tmdb_use_reviews")
 
     val settings: StateFlow<TmdbSettings> = profileManager.activeProfileId.flatMapLatest { pid ->
         factory.get(pid, FEATURE).data.map { prefs ->
@@ -65,7 +66,8 @@ class TmdbSettingsDataStore @Inject constructor(
                 useEpisodes = prefs[useEpisodesKey] ?: true,
                 useTrailers = prefs[useTrailersKey] ?: false,
                 useMoreLikeThis = prefs[useMoreLikeThisKey] ?: true,
-                useCollections = prefs[useCollectionsKey] ?: true
+                useCollections = prefs[useCollectionsKey] ?: true,
+                useReviews = prefs[useReviewsKey] ?: false
             )
         }
     }.stateIn(scope, SharingStarted.Eagerly, TmdbSettings())
@@ -128,5 +130,9 @@ class TmdbSettingsDataStore @Inject constructor(
 
     suspend fun setUseCollections(enabled: Boolean) {
         store().edit { it[useCollectionsKey] = enabled }
+    }
+
+    suspend fun setUseReviews(enabled: Boolean) {
+        store().edit { it[useReviewsKey] = enabled }
     }
 }
