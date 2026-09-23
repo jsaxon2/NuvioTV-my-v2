@@ -87,7 +87,10 @@ sealed class ContinueWatchingItem {
     ) : ContinueWatchingItem()
 
     @Immutable
-    data class NextUp(val info: NextUpInfo) : ContinueWatchingItem()
+    data class NextUp(
+        val info: NextUpInfo,
+        override val shufflePlayback: Boolean = false
+    ) : ContinueWatchingItem()
 }
 
 /** Movies are always in-progress entries; Next Up entries are always series episodes. */
