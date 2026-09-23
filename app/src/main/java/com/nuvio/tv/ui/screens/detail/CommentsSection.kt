@@ -105,6 +105,7 @@ import com.nuvio.tv.ui.screens.ambient.AmbientDialogEffect
 fun CommentsSection(
     comments: List<TraktCommentReview>,
     commentsMode: CommentsMode,
+    commentsSource: CommentsSource = CommentsSource.TRAKT,
     canToggleEpisodeComments: Boolean,
     titleModeFocusRequester: FocusRequester? = null,
     episodeModeFocusRequester: FocusRequester? = null,
@@ -196,6 +197,8 @@ fun CommentsSection(
             selectedEpisode.season ?: 0,
             selectedEpisode.episode ?: 0
         )
+    } else if (commentsSource == CommentsSource.TMDB) {
+        stringResource(R.string.detail_comments_subtitle_tmdb)
     } else {
         stringResource(R.string.detail_comments_subtitle)
     }
@@ -246,17 +249,30 @@ fun CommentsSection(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.sm)
         ) {
-            Image(
-                painter = painterResource(id = R.drawable.trakt_logo_wordmark),
-                contentDescription = stringResource(R.string.cd_trakt_logo),
-                modifier = Modifier
-                    .offset(y = (-1).dp)
-                    .width(47.dp)
-                    .height(20.dp),
-                colorFilter = ColorFilter.tint(NuvioTheme.colors.TextPrimary)
-            )
+            if (commentsSource == CommentsSource.TMDB) {
+                Image(
+                    painter = painterResource(id = R.drawable.rating_tmdb),
+                    contentDescription = stringResource(R.string.cd_tmdb_logo),
+                    modifier = Modifier
+                        .width(28.dp)
+                        .height(20.dp)
+                )
+            } else {
+                Image(
+                    painter = painterResource(id = R.drawable.trakt_logo_wordmark),
+                    contentDescription = stringResource(R.string.cd_trakt_logo),
+                    modifier = Modifier
+                        .offset(y = (-1).dp)
+                        .width(47.dp)
+                        .height(20.dp),
+                    colorFilter = ColorFilter.tint(NuvioTheme.colors.TextPrimary)
+                )
+            }
             Text(
-                text = stringResource(R.string.detail_comments_title),
+                text = stringResource(
+                    if (commentsSource == CommentsSource.TMDB) R.string.detail_comments_title_reviews
+                    else R.string.detail_comments_title
+                ),
                 style = MaterialTheme.typography.titleLarge,
                 color = NuvioTheme.colors.TextPrimary
             )
@@ -387,7 +403,10 @@ fun CommentsSection(
 
             comments.isEmpty() -> {
                 Text(
-                    text = stringResource(R.string.detail_comments_empty),
+                    text = stringResource(
+                        if (commentsSource == CommentsSource.TMDB) R.string.detail_comments_empty_tmdb
+                        else R.string.detail_comments_empty
+                    ),
                     style = MaterialTheme.typography.bodyMedium,
                     color = NuvioTheme.colors.TextSecondary,
                     modifier = Modifier.padding(start = detailStartInset, end = NuvioTheme.spacing.xxxl)
