@@ -250,6 +250,20 @@ fun TmdbSettingsContent(
                     )
                 }
 
+                item(key = "tmdb_reviews") {
+                    SettingsToggleRow(
+                        title = stringResource(R.string.tmdb_reviews_title),
+                        subtitle = stringResource(R.string.tmdb_reviews_subtitle),
+                        checked = uiState.useReviews,
+                        enabled = uiState.enabled,
+                        onToggle = {
+                            viewModel.onEvent(
+                                TmdbSettingsEvent.ToggleReviews(!uiState.useReviews)
+                            )
+                        }
+                    )
+                }
+
             }
             SettingsVerticalScrollIndicators(state = tmdbListState)
             }
