@@ -1734,6 +1734,13 @@
     <string name="tmdb_more_like_this_subtitle">TMDB recommendation backdrops on detail and post-play screens</string>
     <string name="tmdb_collections_title">Collections</string>
     <string name="tmdb_collections_subtitle">TMDB movie collections in release order</string>
+    <string name="tmdb_reviews_title">Reviews</string>
+    <string name="tmdb_reviews_subtitle">Show TMDB reviews on metadata pages instead of Trakt reviews</string>
+    <string name="detail_comments_title_reviews">Reviews</string>
+    <string name="detail_comments_subtitle_tmdb">Reviews from TMDB</string>
+    <string name="detail_comments_empty_tmdb">No TMDB reviews available yet.</string>
+    <string name="detail_comments_error_tmdb">Couldn\'t load TMDB reviews right now.</string>
+    <string name="cd_tmdb_logo">TMDB Logo</string>
 
     <string name="tmdb_language_dialog_title">TMDB language</string>
 
