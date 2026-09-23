@@ -22,6 +22,11 @@ enum class MoreLikeThisSource {
     SIMKL
 }
 
+enum class CommentsSource {
+    TRAKT,
+    TMDB
+}
+
 enum class CommentsMode {
     TITLE,
     EPISODE
@@ -96,6 +101,7 @@ data class MetaDetailsUiState(
     val commentsError: String? = null,
     val shouldShowCommentsSection: Boolean = false,
     val commentsMode: CommentsMode = CommentsMode.TITLE,
+    val commentsSource: CommentsSource = CommentsSource.TRAKT,
     val commentsEpisodeTarget: Video? = null,
     val selectedComment: TraktCommentReview? = null,
     val userMessage: String? = null,
