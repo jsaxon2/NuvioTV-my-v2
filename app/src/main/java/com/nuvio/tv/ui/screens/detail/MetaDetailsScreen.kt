@@ -3317,6 +3317,7 @@ private fun MetaDetailsContent(
             CommentOverlay(
                 review = review,
                 episode = if (commentsMode == CommentsMode.EPISODE) commentsEpisodeTarget else null,
+                commentsSource = commentsSource,
                 canNavigatePrevious = selectedCommentIndex > 0,
                 canNavigateNext = selectedCommentIndex >= 0 && (
                     selectedCommentIndex < comments.comments.lastIndex || comments.canLoadMore || comments.loadingMore
