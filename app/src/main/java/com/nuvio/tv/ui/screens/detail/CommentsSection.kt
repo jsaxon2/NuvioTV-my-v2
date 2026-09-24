@@ -778,6 +778,7 @@ private fun EpisodeCommentPickerDialog(
 fun CommentOverlay(
     review: TraktCommentReview,
     episode: Video?,
+    commentsSource: CommentsSource = CommentsSource.TRAKT,
     canNavigatePrevious: Boolean,
     canNavigateNext: Boolean,
     isLoadingNext: Boolean,
@@ -871,12 +872,23 @@ fun CommentOverlay(
                 horizontalAlignment = Alignment.Start,
                 verticalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.xs)
             ) {
-                Image(
-                    painter = painterResource(id = R.drawable.trakt_logo_wordmark),
-                    contentDescription = stringResource(R.string.cd_trakt_logo),
-                    modifier = Modifier.width(168.dp),
-                    colorFilter = ColorFilter.tint(Color.White.copy(alpha = 0.92f))
-                )
+                if (commentsSource == CommentsSource.TMDB) {
+                    Image(
+                        painter = painterResource(id = R.drawable.rating_tmdb),
+                        contentDescription = stringResource(R.string.cd_tmdb_logo),
+                        modifier = Modifier
+                            .padding(start = 18.dp)
+                            .width(64.dp)
+                            .height(46.dp)
+                    )
+                } else {
+                    Image(
+                        painter = painterResource(id = R.drawable.trakt_logo_wordmark),
+                        contentDescription = stringResource(R.string.cd_trakt_logo),
+                        modifier = Modifier.width(168.dp),
+                        colorFilter = ColorFilter.tint(Color.White.copy(alpha = 0.92f))
+                    )
+                }
                 Text(
                     text = stringResource(R.string.detail_comments_back_hint),
                     modifier = Modifier.padding(start = 18.dp),
