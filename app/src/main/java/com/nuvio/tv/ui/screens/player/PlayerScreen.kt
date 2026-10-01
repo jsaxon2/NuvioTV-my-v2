@@ -1229,13 +1229,9 @@ fun PlayerScreen(
                 } else {
                     subtitleDelaySyncLineFocusRequester
                 }
-            } else if (uiState.showControls) {
-                // Controls visible: UP reaches the icon cluster (Info is its leftmost,
-                // always-present button) instead of falling through to hide-controls,
-                // which previously trapped focus on the Skip button. Nav becomes
-                // scrubber -> skip -> cluster, cluster -> down -> scrubber.
-                streamInfoFocusRequester
             } else {
+                // The icon cluster sits below the seek bar, so nothing is above Skip:
+                // UP hides the controls.
                 null
             },
             rightFocusRequester = if (uiState.postPlayMode is PostPlayMode.AutoPlay) nextEpisodeFocusRequester else null,
@@ -2333,127 +2329,6 @@ private fun PlayerControlsOverlay(
                 }
             }
                 }
-
-                CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-                    val statsSlide by animateDpAsState(
-                        targetValue = if (uiState.showPlaybackStatsOverlay) -(StatsPanelWidth + NuvioTheme.spacing.sm) else 0.dp,
-                        animationSpec = tween(NuvioMotion.tokens.durations.fast),
-                        label = "statsClusterSlide"
-                    )
-                    Row(
-                        modifier = Modifier.offset(x = statsSlide),
-                        horizontalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.xs),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        ControlButton(
-                            icon = Icons.Default.Info,
-                            contentDescription = stringResource(R.string.cd_playback_stats),
-                            onClick = onTogglePlaybackStats,
-                            focusRequester = streamInfoFocusRequester,
-                            downFocusRequester = progressBarFocusRequester,
-                            onUpKey = onHideControls,
-                            onFocused = onResetHideTimer
-                        )
-                        if (hasAudioControl) {
-                        ControlButton(
-                            icon = Icons.Default.Speaker,
-                            contentDescription = stringResource(R.string.cd_audio_tracks),
-                            onClick = onShowAudioDialog,
-                            downFocusRequester = progressBarFocusRequester,
-                            onUpKey = onHideControls,
-                            onFocused = onResetHideTimer
-                        )
-                        }
-                        if (hasSubtitleControl) {
-                        ControlButton(
-                            icon = Icons.Default.Chat,
-                            contentDescription = stringResource(R.string.cd_subtitles),
-                            onClick = onShowSubtitleDialog,
-                            downFocusRequester = progressBarFocusRequester,
-                            onUpKey = onHideControls,
-                            onFocused = onResetHideTimer
-                        )
-                        }
-                        ControlButton(
-                            icon = Icons.Default.Cloud,
-                            contentDescription = stringResource(R.string.cd_sources),
-                            onClick = onShowSourcesPanel,
-                            downFocusRequester = progressBarFocusRequester,
-                            onUpKey = onHideControls,
-                            onFocused = onResetHideTimer
-                        )
-                        AnimatedVisibility(
-                            visible = uiState.showMoreDialog,
-                            enter = slideInHorizontally(
-                                animationSpec = tween(NuvioMotion.tokens.durations.fast),
-                                initialOffsetX = { it / 2 }
-                            ) + fadeIn(animationSpec = tween(NuvioMotion.tokens.durations.fast)),
-                            exit = slideOutHorizontally(
-                                animationSpec = tween(160),
-                                targetOffsetX = { it / 2 }
-                            ) + fadeOut(animationSpec = tween(160))
-                        ) {
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.xs),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                        ControlButton(
-                            icon = Icons.Default.Speed,
-                            contentDescription = stringResource(R.string.cd_playback_speed),
-                            onClick = onShowSpeedDialog,
-                            downFocusRequester = progressBarFocusRequester,
-                            onUpKey = onHideControls,
-                            onFocused = onResetHideTimer
-                        )
-                        ControlButton(
-                            icon = Icons.Default.AspectRatio,
-                            iconPainter = customAspectPainter,
-                            contentDescription = stringResource(R.string.cd_aspect_ratio),
-                            onClick = onToggleAspectRatio,
-                            downFocusRequester = progressBarFocusRequester,
-                            onUpKey = onHideControls,
-                            onFocused = onResetHideTimer
-                        )
-                        ControlButton(
-                            icon = Icons.AutoMirrored.Filled.OpenInNew,
-                            contentDescription = stringResource(R.string.cd_open_external_player),
-                            onClick = onOpenInExternalPlayer,
-                            downFocusRequester = progressBarFocusRequester,
-                            onUpKey = onHideControls,
-                            onFocused = onResetHideTimer
-                        )
-                        ControlButton(
-                            icon = Icons.Default.SwapHoriz,
-                            contentDescription = stringResource(R.string.cd_switch_player_engine),
-                            onClick = onSwitchPlayerEngine,
-                            downFocusRequester = progressBarFocusRequester,
-                            onUpKey = onHideControls,
-                            onFocused = onResetHideTimer
-                        )
-                            if (uiState.playbackIssueReportsEnabled) {
-                                ReportControlButton(
-                                    reportId = uiState.playbackIssueReportId,
-                                    showReportId = reportCodeVisible,
-                                    onClick = onReportPlaybackIssue,
-                                    enabled = uiState.playbackIssueReportStatus != PlaybackIssueReportStatus.Sending &&
-                                        uiState.playbackIssueReportStatus != PlaybackIssueReportStatus.Sent,
-                                    upFocusRequester = progressBarFocusRequester,
-                                    onDownKey = onHideControls,
-                                    onFocused = onResetHideTimer
-                                )
-                            }
-                            }
-                        }
-                        ControlButton(
-                            icon = if (uiState.showMoreDialog) Icons.AutoMirrored.Filled.KeyboardArrowLeft else Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                            contentDescription = if (uiState.showMoreDialog) stringResource(R.string.cd_close_more_actions) else stringResource(R.string.cd_more_actions),
-                            onClick = onToggleMoreActions,
-                            downFocusRequester = progressBarFocusRequester,
-                            onUpKey = onHideControls,
-                            onFocused = onResetHideTimer
-                        )
-                    }
-                }
             }
 
             Spacer(modifier = Modifier.height(NuvioTheme.spacing.xs))
@@ -2463,7 +2338,7 @@ private fun PlayerControlsOverlay(
                 PlayerControlsProgressBarHost(
                     viewModel = viewModel,
                     focusRequester = progressBarFocusRequester,
-                    upFocusRequester = progressBarUpFocusRequester ?: streamInfoFocusRequester,
+                    upFocusRequester = progressBarUpFocusRequester,
                     downFocusRequester = playPauseFocusRequester,
                     onUpKey = onHideControls,
                     onFocused = onResetHideTimer
@@ -2495,6 +2370,7 @@ private fun PlayerControlsOverlay(
 
             CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
                 Row(
+                    modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.sm),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -2536,6 +2412,121 @@ private fun PlayerControlsOverlay(
                         onDownKey = onHideControls,
                         onFocused = onResetHideTimer
                     )
+                    }
+
+                    // Icon cluster, right-aligned below the seek bar.
+                    Spacer(modifier = Modifier.weight(1f))
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.xs),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        ControlButton(
+                            icon = Icons.Default.Info,
+                            contentDescription = stringResource(R.string.cd_playback_stats),
+                            onClick = onTogglePlaybackStats,
+                            focusRequester = streamInfoFocusRequester,
+                            upFocusRequester = progressBarFocusRequester,
+                            onDownKey = onHideControls,
+                            onFocused = onResetHideTimer
+                        )
+                        if (hasAudioControl) {
+                        ControlButton(
+                            icon = Icons.Default.Speaker,
+                            contentDescription = stringResource(R.string.cd_audio_tracks),
+                            onClick = onShowAudioDialog,
+                            upFocusRequester = progressBarFocusRequester,
+                            onDownKey = onHideControls,
+                            onFocused = onResetHideTimer
+                        )
+                        }
+                        if (hasSubtitleControl) {
+                        ControlButton(
+                            icon = Icons.Default.Chat,
+                            contentDescription = stringResource(R.string.cd_subtitles),
+                            onClick = onShowSubtitleDialog,
+                            upFocusRequester = progressBarFocusRequester,
+                            onDownKey = onHideControls,
+                            onFocused = onResetHideTimer
+                        )
+                        }
+                        ControlButton(
+                            icon = Icons.Default.Cloud,
+                            contentDescription = stringResource(R.string.cd_sources),
+                            onClick = onShowSourcesPanel,
+                            upFocusRequester = progressBarFocusRequester,
+                            onDownKey = onHideControls,
+                            onFocused = onResetHideTimer
+                        )
+                        AnimatedVisibility(
+                            visible = uiState.showMoreDialog,
+                            enter = slideInHorizontally(
+                                animationSpec = tween(NuvioMotion.tokens.durations.fast),
+                                initialOffsetX = { it / 2 }
+                            ) + fadeIn(animationSpec = tween(NuvioMotion.tokens.durations.fast)),
+                            exit = slideOutHorizontally(
+                                animationSpec = tween(160),
+                                targetOffsetX = { it / 2 }
+                            ) + fadeOut(animationSpec = tween(160))
+                        ) {
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.xs),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                        ControlButton(
+                            icon = Icons.Default.Speed,
+                            contentDescription = stringResource(R.string.cd_playback_speed),
+                            onClick = onShowSpeedDialog,
+                            upFocusRequester = progressBarFocusRequester,
+                            onDownKey = onHideControls,
+                            onFocused = onResetHideTimer
+                        )
+                        ControlButton(
+                            icon = Icons.Default.AspectRatio,
+                            iconPainter = customAspectPainter,
+                            contentDescription = stringResource(R.string.cd_aspect_ratio),
+                            onClick = onToggleAspectRatio,
+                            upFocusRequester = progressBarFocusRequester,
+                            onDownKey = onHideControls,
+                            onFocused = onResetHideTimer
+                        )
+                        ControlButton(
+                            icon = Icons.AutoMirrored.Filled.OpenInNew,
+                            contentDescription = stringResource(R.string.cd_open_external_player),
+                            onClick = onOpenInExternalPlayer,
+                            upFocusRequester = progressBarFocusRequester,
+                            onDownKey = onHideControls,
+                            onFocused = onResetHideTimer
+                        )
+                        ControlButton(
+                            icon = Icons.Default.SwapHoriz,
+                            contentDescription = stringResource(R.string.cd_switch_player_engine),
+                            onClick = onSwitchPlayerEngine,
+                            upFocusRequester = progressBarFocusRequester,
+                            onDownKey = onHideControls,
+                            onFocused = onResetHideTimer
+                        )
+                            if (uiState.playbackIssueReportsEnabled) {
+                                ReportControlButton(
+                                    reportId = uiState.playbackIssueReportId,
+                                    showReportId = reportCodeVisible,
+                                    onClick = onReportPlaybackIssue,
+                                    enabled = uiState.playbackIssueReportStatus != PlaybackIssueReportStatus.Sending &&
+                                        uiState.playbackIssueReportStatus != PlaybackIssueReportStatus.Sent,
+                                    upFocusRequester = progressBarFocusRequester,
+                                    onDownKey = onHideControls,
+                                    onFocused = onResetHideTimer
+                                )
+                            }
+                            }
+                        }
+                        ControlButton(
+                            icon = if (uiState.showMoreDialog) Icons.AutoMirrored.Filled.KeyboardArrowLeft else Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                            contentDescription = if (uiState.showMoreDialog) stringResource(R.string.cd_close_more_actions) else stringResource(R.string.cd_more_actions),
+                            onClick = onToggleMoreActions,
+                            upFocusRequester = progressBarFocusRequester,
+                            onDownKey = onHideControls,
+                            onFocused = onResetHideTimer
+                        )
                     }
                 }
             }
