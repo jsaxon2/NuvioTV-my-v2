@@ -190,8 +190,7 @@ internal fun StreamSourcesSidePanel(
         modifier = modifier
             .heightIn(max = 900.dp)
             .width(440.dp)
-            .clip(RoundedCornerShape(topStart = NuvioTheme.spacing.lg, bottomStart = NuvioTheme.spacing.lg))
-            .background(Color.Black.copy(alpha = 0.85f))
+            .playerGlass(RoundedCornerShape(topStart = NuvioTheme.spacing.lg, bottomStart = NuvioTheme.spacing.lg))
     ) {
         Column(modifier = Modifier.padding(NuvioTheme.spacing.lg)) {
             PanelEyebrow(text = stringResource(R.string.sources_title))

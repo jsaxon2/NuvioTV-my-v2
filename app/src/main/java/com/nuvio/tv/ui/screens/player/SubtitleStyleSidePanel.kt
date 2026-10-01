@@ -104,8 +104,7 @@ internal fun SubtitleStyleSidePanel(
         modifier = modifier
             .width(760.dp)
             .height(330.dp)
-            .clip(RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp))
-            .background(Color(0xFF101010))
+            .playerGlass(RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp))
             .then(if (isStyleDisabledByLibass) Modifier.focusProperties { canFocus = false } else Modifier)
             .padding(start = NuvioTheme.spacing.lg, end = NuvioTheme.spacing.lg, top = 22.dp, bottom = 10.dp)
     ) {

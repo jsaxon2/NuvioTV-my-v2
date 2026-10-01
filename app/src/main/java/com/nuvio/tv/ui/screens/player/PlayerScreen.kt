@@ -1527,7 +1527,7 @@ fun PlayerScreen(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.45f))
+                    .background(Color.Black.copy(alpha = PLAYER_GLASS_SCRIM_ALPHA))
             )
         }
 
@@ -1569,7 +1569,7 @@ fun PlayerScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.45f))
+                    .background(Color.Black.copy(alpha = PLAYER_GLASS_SCRIM_ALPHA))
             )
         }
 
@@ -1613,7 +1613,7 @@ fun PlayerScreen(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.35f))
+                    .background(Color.Black.copy(alpha = PLAYER_GLASS_SCRIM_ALPHA))
             )
         }
 
@@ -3554,8 +3554,7 @@ private fun SpeedSelectionDialog(
         Box(
             modifier = Modifier
                 .width(300.dp)
-                .clip(RoundedCornerShape(NuvioTheme.radii.xxl))
-                .background(Color.Black.copy(alpha = 0.85f))
+                .playerGlass(RoundedCornerShape(NuvioTheme.radii.xxl))
         ) {
             Column(
                 modifier = Modifier.padding(NuvioTheme.spacing.xl)
@@ -3597,8 +3596,7 @@ private fun MoreActionsDialog(
         Box(
             modifier = Modifier
                 .width(360.dp)
-                .clip(RoundedCornerShape(NuvioTheme.radii.xxl))
-                .background(Color.Black.copy(alpha = 0.85f))
+                .playerGlass(RoundedCornerShape(NuvioTheme.radii.xxl))
         ) {
             Column(
                 modifier = Modifier.padding(NuvioTheme.spacing.xl),

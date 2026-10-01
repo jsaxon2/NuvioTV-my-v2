@@ -251,7 +251,7 @@ internal fun SubtitleSelectionOverlay(
                 .width(320.dp)
                 .align(Alignment.BottomEnd)
                 .heightIn(max = 620.dp)
-                .background(Color.Black.copy(alpha = 0.85f), RoundedCornerShape(20.dp))
+                .playerGlass(RoundedCornerShape(20.dp))
                 .padding(horizontal = 16.dp, vertical = 14.dp)
         ) {
             PanelEyebrow(text = stringResource(R.string.subtitle_dialog_title))
