@@ -980,7 +980,8 @@ class HomeViewModel @Inject constructor(
                         episodeDescription = cached.episodeDescription,
                         episodeImdbRating = if (cached.ratingVisible != false) cached.episodeImdbRating else null,
                         genres = cached.genres,
-                        releaseInfo = cached.releaseInfo
+                        releaseInfo = cached.releaseInfo,
+                        episodeReleased = cached.episodeReleased
                     )
                 }
             val nextUpItems = cachedNextUp

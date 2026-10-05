@@ -67,6 +67,7 @@ data class CachedInProgressItem(
     @SerializedName("episodeImdbRating", alternate = ["q"]) val episodeImdbRating: Float? = null,
     @SerializedName("genres", alternate = ["r"]) val genres: List<String> = emptyList(),
     @SerializedName("releaseInfo", alternate = ["s"]) val releaseInfo: String? = null,
+    @SerializedName("episodeReleased") val episodeReleased: String? = null,
     @SerializedName("contentLanguage", alternate = ["t"]) val contentLanguage: String? = null,
     /** Null in snapshots from before this field: Gson skips Kotlin defaults, and those showed the rating. */
     @SerializedName("ratingVisible", alternate = ["u"]) val ratingVisible: Boolean? = null
