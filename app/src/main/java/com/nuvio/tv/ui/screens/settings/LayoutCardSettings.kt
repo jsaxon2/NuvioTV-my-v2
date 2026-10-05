@@ -151,6 +151,7 @@ internal fun LayoutContinueWatchingSection(
                 ContinueWatchingSortMode.DEFAULT -> stringResource(R.string.layout_cw_sort_default)
                 ContinueWatchingSortMode.STREAMING_STYLE -> stringResource(R.string.layout_cw_sort_streaming)
                 ContinueWatchingSortMode.SPLIT_UPCOMING -> stringResource(R.string.layout_cw_sort_split_upcoming)
+                ContinueWatchingSortMode.LAST_AIRED -> stringResource(R.string.layout_cw_sort_last_aired)
             },
             onClick = { showSortModeDialog = true }
         )
@@ -506,6 +507,11 @@ private fun ContinueWatchingSortModeDialog(
             ContinueWatchingSortMode.SPLIT_UPCOMING,
             stringResource(R.string.layout_cw_sort_split_upcoming),
             stringResource(R.string.layout_cw_sort_split_upcoming_desc)
+        ),
+        SettingsPickerOption(
+            ContinueWatchingSortMode.LAST_AIRED,
+            stringResource(R.string.layout_cw_sort_last_aired),
+            stringResource(R.string.layout_cw_sort_last_aired_desc)
         )
     )
 
