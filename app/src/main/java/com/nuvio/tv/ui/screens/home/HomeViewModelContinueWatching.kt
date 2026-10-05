@@ -493,6 +493,7 @@ internal fun HomeViewModel.loadContinueWatchingPipeline() {
                                                     episodeImdbRating = cached?.episodeImdbRating,
                                                     genres = cached?.genres ?: emptyList(),
                                                     releaseInfo = cached?.releaseInfo,
+                                                    episodeReleased = cached?.episodeReleased,
                                                     contentLanguage = cached?.contentLanguage
                                                 )
                                             )
@@ -530,7 +531,8 @@ internal fun HomeViewModel.loadContinueWatchingPipeline() {
                                                     episodeDescription = cached.episodeDescription,
                                                     episodeImdbRating = cached.episodeImdbRating,
                                                     genres = cached.genres,
-                                                    releaseInfo = cached.releaseInfo
+                                                    releaseInfo = cached.releaseInfo,
+                                                    episodeReleased = cached.episodeReleased
                                                 )
                                             )
                                         }
@@ -646,6 +648,7 @@ internal fun HomeViewModel.loadContinueWatchingPipeline() {
                                                     episodeDescription = item.episodeDescription,
                                                     episodeImdbRating = item.episodeImdbRating,
                                                     genres = item.genres, releaseInfo = item.releaseInfo,
+                                                    episodeReleased = item.episodeReleased,
                                                     contentLanguage = item.contentLanguage,
                                                     ratingVisible = !isSeries ||
                                                         ratingVisibility.showEpisodeRating(isWatched = item.progress.isCompleted())
@@ -1228,6 +1231,7 @@ internal fun HomeViewModel.loadContinueWatchingPipeline() {
                                             episodeThumbnail = ip.episodeThumbnail?.takeIf { it !in brokenUrls },
                                             episodeDescription = ip.episodeDescription, episodeImdbRating = ip.episodeImdbRating,
                                             genres = ip.genres, releaseInfo = ip.releaseInfo,
+                                            episodeReleased = ip.episodeReleased,
                                             contentLanguage = ip.contentLanguage,
                                             ratingVisible = !isSeries || ratingVisibility.showEpisodeRating(isWatched = p.isCompleted())
                                         )
@@ -1762,6 +1766,21 @@ internal fun sortContinueWatchingItems(
             }
         }
 
+        ContinueWatchingSortMode.LAST_AIRED -> items.sortedWith(
+            compareByDescending<ContinueWatchingItem> { item ->
+                val rawDate = when (item) {
+                    is ContinueWatchingItem.InProgress -> item.episodeReleased
+                    is ContinueWatchingItem.NextUp -> item.info.released
+                }
+                parseEpisodeReleaseDate(rawDate)
+            }.thenByDescending { item ->
+                when (item) {
+                    is ContinueWatchingItem.InProgress -> item.progress.lastWatched
+                    is ContinueWatchingItem.NextUp -> item.info.sortTimestamp
+                }
+            }
+        )
+
         ContinueWatchingSortMode.STREAMING_STYLE -> {
             val (released, unreleased) = items.partition { item ->
                 when (item) {
@@ -1835,8 +1854,10 @@ internal fun mergeContinueWatchingItems(
 }
 
 /**
- * Splits items into (mainRow, upcomingRow) for [ContinueWatchingSortMode.SPLIT_UPCOMING].
- * Upcoming items are unaired NextUp episodes; everything else stays in the main row.
+ * Splits items into (mainRow, upcomingRow) for [ContinueWatchingSortMode.SPLIT_UPCOMING]
+ * and [ContinueWatchingSortMode.LAST_AIRED]. Upcoming items are NextUp episodes whose
+ * release date is today or later; an episode moves to the main row starting the day
+ * after it airs, not the instant it airs. Everything else stays in the main row.
  * For other modes, all items go into mainRow and upcomingRow is empty.
  */
 internal fun splitUpcomingItems(
@@ -1844,11 +1865,18 @@ internal fun splitUpcomingItems(
     mode: ContinueWatchingSortMode
 ): Pair<List<ContinueWatchingItem>, List<ContinueWatchingItem>> {
     val unique = distinctContinueWatchingItems(items)
-    if (mode != ContinueWatchingSortMode.SPLIT_UPCOMING) {
+    if (mode != ContinueWatchingSortMode.SPLIT_UPCOMING && mode != ContinueWatchingSortMode.LAST_AIRED) {
         return unique to emptyList()
     }
+    val today = LocalDate.now()
     val (upcoming, main) = unique.partition { item ->
-        item is ContinueWatchingItem.NextUp && !item.info.hasAired
+        if (item !is ContinueWatchingItem.NextUp) return@partition false
+        val releaseDate = parseEpisodeReleaseDate(item.info.released)
+        if (releaseDate != null) {
+            !releaseDate.isBefore(today)
+        } else {
+            !item.info.hasAired
+        }
     }
     // Sort upcoming by release date ascending (soonest first)
     val sortedUpcoming = upcoming.sortedWith { a, b ->
@@ -2055,6 +2083,7 @@ private suspend fun HomeViewModel.enrichInProgressItem(
         episodeImdbRating = if (isSeriesTypeCW(item.progress.contentType)) episodeRating else if (settings.useBasicInfo) imdbRating else meta.imdbRating,
         genres = genres,
         releaseInfo = releaseInfo,
+        episodeReleased = video?.released ?: item.episodeReleased,
         contentLanguage = tmdbData?.contentLanguage
             ?: normalizeLanguageCode(meta.language)
             ?: countryToLanguageCode(meta.country)
@@ -2812,6 +2841,7 @@ private fun HomeViewModel.persistLocalContinueWatchingMetadata(
                 episodeImdbRating = ip.episodeImdbRating,
                 genres = ip.genres,
                 releaseInfo = ip.releaseInfo,
+                episodeReleased = ip.episodeReleased,
                 contentLanguage = ip.contentLanguage,
                 ratingVisible = !isSeries || ratingVisibility.showEpisodeRating(isWatched = p.isCompleted())
             )
@@ -2954,6 +2984,7 @@ private suspend fun HomeViewModel.applyContinueWatchingEnrichmentOverlay(
                         episodeImdbRating = overlay.episodeImdbRating ?: item.episodeImdbRating,
                         genres = overlay.genres.ifEmpty { item.genres },
                         releaseInfo = overlay.releaseInfo ?: item.releaseInfo,
+                        episodeReleased = overlay.episodeReleased ?: item.episodeReleased,
                         contentLanguage = overlay.contentLanguage ?: item.contentLanguage,
                         mdbListRatings = overlay.mdbListRatings ?: item.mdbListRatings
                     )
