@@ -91,6 +91,7 @@ sealed class ContinueWatchingItem {
         val episodeImdbRating: Float? = null,
         val genres: List<String> = emptyList(),
         val releaseInfo: String? = null,
+        val episodeReleased: String? = null,
         val contentLanguage: String? = null,
         override val shufflePlayback: Boolean = false,
         val originalPoster: String? = null,
