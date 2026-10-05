@@ -64,6 +64,7 @@ data class CachedInProgressItem(
     val episodeImdbRating: Float? = null,
     val genres: List<String> = emptyList(),
     val releaseInfo: String? = null,
+    val episodeReleased: String? = null,
     val contentLanguage: String? = null,
     /** Null in snapshots from before this field: Gson skips Kotlin defaults, and those showed the rating. */
     val ratingVisible: Boolean? = null
