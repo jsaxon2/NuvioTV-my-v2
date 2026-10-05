@@ -1,5 +1,9 @@
 package com.nuvio.tv.ui.screens.home
 
+import kotlinx.coroutines.flow.MutableStateFlow
+import io.mockk.every
+import com.nuvio.tv.data.simkl.SimklSyncState
+import com.nuvio.tv.data.simkl.SimklSyncRepository
 import androidx.lifecycle.viewModelScope
 import com.nuvio.tv.data.trailer.TrailerLookupResult
 import com.nuvio.tv.data.trailer.TrailerPlaybackFailures
@@ -279,7 +283,10 @@ class HomeTrailerLookupTest {
             prefetchSelectionSupplier = mockk(relaxed = true),
             streamRepository = mockk(relaxed = true),
             trailerSettingsDataStore = mockk(relaxed = true),
-            serverCatalog = mockk { every { addons } returns flowOf(emptyList()) }
+            serverCatalog = mockk { every { addons } returns flowOf(emptyList()) },
+            simklSyncRepository = mockk<SimklSyncRepository>(relaxed = true) {
+                every { state } returns MutableStateFlow(SimklSyncState())
+            }
         )
         viewModel.startupGracePeriodActive = false
         viewModel.externalMetaPrefetchEnabled = true
