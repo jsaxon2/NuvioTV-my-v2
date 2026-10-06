@@ -281,6 +281,9 @@ open class MainActivity : ComponentActivity() {
     lateinit var startupSyncService: StartupSyncService
 
     @Inject
+    lateinit var androidTvChannelSyncService: com.nuvio.tv.core.sync.androidtv.AndroidTvChannelSyncService
+
+    @Inject
     lateinit var profileSyncService: ProfileSyncService
 
     @Inject
@@ -1432,6 +1435,7 @@ open class MainActivity : ComponentActivity() {
         super.onStart()
         startupSyncService.startPeriodicSurfacePulls()
         partyRuntime.setAppVisible(true)
+        androidTvChannelSyncService.onForegroundChanged(true)
     }
 
     override fun onStop() {
@@ -1439,6 +1443,9 @@ open class MainActivity : ComponentActivity() {
         super.onStop()
         startupSyncService.stopPeriodicSurfacePulls()
         partyRuntime.setAppVisible(false)
+        // App going to background (e.g. user returning to the launcher): reconcile the
+        // Continue Watching channel once so the launcher repaints it with fresh progress.
+        androidTvChannelSyncService.onForegroundChanged(false)
     }
 
     override fun onDestroy() {
