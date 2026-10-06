@@ -12,6 +12,7 @@ import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
+import com.nuvio.tv.core.sync.androidtv.AndroidTvChannelManager
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.sync.withLock
@@ -25,10 +26,13 @@ class AccountLocalDataResetService @Inject constructor(
     private val profileDataStore: ProfileDataStore,
     private val profileLockStateDataStore: ProfileLockStateDataStore,
     private val credentialStores: Set<@JvmSuppressWildcards ProfileScopedCredentialStore>,
+    private val androidTvChannelManager: AndroidTvChannelManager,
     private val snapshotStorage: ContinueWatchingSnapshotStorage = ContinueWatchingSnapshotStorage(context)
 ) {
     suspend fun clearAfterSignOut() = snapshotStorage.lifecycleMutex.withLock {
         withContext(Dispatchers.IO + NonCancellable) {
+            runCatching { androidTvChannelManager.clearAll() }
+                .onFailure { Log.w(ACCOUNT_RESET_TAG, "Failed to clear Android TV channel data", it) }
             runCatching { snapshotStorage.clearAllProfiles() }
                 .onFailure { Log.w(ACCOUNT_RESET_TAG, "Failed to clear CW snapshots", it) }
             runCatching { profileDataStoreFactory.clearProfileScopedData() }
