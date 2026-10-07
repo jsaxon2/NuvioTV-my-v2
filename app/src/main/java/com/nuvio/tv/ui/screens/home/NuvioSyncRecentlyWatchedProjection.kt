@@ -26,7 +26,7 @@ internal fun nuvioSyncRecentlyWatchedPreviews(
         RecentActivity(item.contentId, item.contentType, item.title, item.poster, item.releaseInfo, item.watchedAt)
     }
     return activity
-        .filter { it.contentId.isNotBlank() && it.atEpochMs >= sinceEpochMs }
+        .filter { it.isMovieOrShow && it.contentId.isNotBlank() && it.atEpochMs >= sinceEpochMs }
         .groupBy { "${it.type}:${it.contentId}" }
         .values
         .map { group ->
@@ -59,7 +59,11 @@ private class RecentActivity(
     val releaseInfo: String?,
     val atEpochMs: Long
 ) {
-    // History only holds movies and episodes; anything that isn't a movie belongs to a show.
-    val type: ContentType =
-        if (ContentType.fromString(rawType) == ContentType.MOVIE) ContentType.MOVIE else ContentType.SERIES
+    private val parsedType = ContentType.fromString(rawType)
+
+    // Movies and shows only; cloud-library files and other entries stay out of the row.
+    val isMovieOrShow: Boolean =
+        parsedType == ContentType.MOVIE || parsedType == ContentType.SERIES || parsedType == ContentType.TV
+
+    val type: ContentType = if (parsedType == ContentType.MOVIE) ContentType.MOVIE else ContentType.SERIES
 }
