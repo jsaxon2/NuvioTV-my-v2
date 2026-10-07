@@ -58,6 +58,21 @@ class NuvioSyncRecentlyWatchedProjectionTest {
     }
 
     @Test
+    fun `cloud library files are left out`() {
+        val previews = nuvioSyncRecentlyWatchedPreviews(
+            progress = listOf(
+                progress("cloud-file-1", "cloud", "home_video.mkv", lastWatched = now - 1 * DAY, season = 1, episode = 1),
+                progress("tt1", "series", "Show One", lastWatched = now - 2 * DAY, season = 1, episode = 1)
+            ),
+            watched = emptyList(),
+            windowDays = 30,
+            nowEpochMs = now
+        )
+
+        assertEquals(listOf("tt1"), previews.map { it.id })
+    }
+
+    @Test
     fun `empty history gives an empty row`() {
         assertTrue(nuvioSyncRecentlyWatchedPreviews(emptyList(), emptyList(), 30, now).isEmpty())
     }
