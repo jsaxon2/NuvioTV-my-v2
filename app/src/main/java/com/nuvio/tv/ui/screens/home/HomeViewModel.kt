@@ -739,16 +739,20 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    // Show posters for the Nuvio Sync Recently Watched row, by series id. Episode progress
-    // stores the episode thumbnail as its poster, so shows are re-resolved to their own poster.
-    private val recentlyWatchedShowPosters = ConcurrentHashMap<String, String>()
-    private val recentlyWatchedShowPosterMisses = ConcurrentHashMap.newKeySet<String>()
+    // Posters for the Nuvio Sync Recently Watched row, by "type:id". Episode progress stores the
+    // episode thumbnail as its poster and watched items store none, so shows always resolve to
+    // their own poster and movies resolve when nothing usable is stored.
+    private val recentlyWatchedPosters = ConcurrentHashMap<String, String>()
+    private val recentlyWatchedPosterMissAt = ConcurrentHashMap<String, Long>()
 
     private suspend fun withRecentlyWatchedShowPosters(previews: List<MetaPreview>): List<MetaPreview> {
+        val now = System.currentTimeMillis()
         val unresolved = previews.filter { preview ->
-            preview.type == com.nuvio.tv.domain.model.ContentType.SERIES &&
-                !recentlyWatchedShowPosters.containsKey(preview.id) &&
-                preview.id !in recentlyWatchedShowPosterMisses
+            val key = recentlyWatchedPosterKey(preview)
+            val needsLookup = preview.type == com.nuvio.tv.domain.model.ContentType.SERIES ||
+                preview.poster.isNullOrBlank()
+            val recentMiss = recentlyWatchedPosterMissAt[key]?.let { now - it < RECENTLY_WATCHED_POSTER_RETRY_MS } == true
+            needsLookup && !recentlyWatchedPosters.containsKey(key) && !recentMiss
         }
         if (unresolved.isNotEmpty()) {
             val gate = Semaphore(4)
@@ -756,32 +760,58 @@ class HomeViewModel @Inject constructor(
                 unresolved.map { preview ->
                     async {
                         gate.withPermit {
-                            val poster = resolveShowPoster(preview.id)
-                            if (poster != null) recentlyWatchedShowPosters[preview.id] = poster
-                            else recentlyWatchedShowPosterMisses.add(preview.id)
+                            val key = recentlyWatchedPosterKey(preview)
+                            val poster = resolveRecentlyWatchedPoster(preview)
+                            if (poster != null) {
+                                recentlyWatchedPosters[key] = poster
+                                recentlyWatchedPosterMissAt.remove(key)
+                            } else {
+                                recentlyWatchedPosterMissAt[key] = System.currentTimeMillis()
+                            }
                         }
                     }
                 }.awaitAll()
             }
         }
         return previews.map { preview ->
-            if (preview.type != com.nuvio.tv.domain.model.ContentType.SERIES) return@map preview
-            recentlyWatchedShowPosters[preview.id]?.let { preview.copy(poster = it) } ?: preview
+            recentlyWatchedPosters[recentlyWatchedPosterKey(preview)]?.let { preview.copy(poster = it) } ?: preview
         }
     }
 
-    private suspend fun resolveShowPoster(seriesId: String): String? {
-        metaRepository.getCachedMeta("series", seriesId)?.poster?.takeIf(String::isNotBlank)?.let { return it }
-        val result = kotlinx.coroutines.withTimeoutOrNull(2_500L) {
-            val metaFlow = if (externalMetaPrefetchEnabled) {
-                metaRepository.getMetaFromAllAddons(type = "series", id = seriesId)
-            } else {
-                metaRepository.getMetaFromPrimaryAddon(type = "series", id = seriesId)
-            }
-            metaFlow.first { it !is com.nuvio.tv.core.network.NetworkResult.Loading }
+    private fun recentlyWatchedPosterKey(preview: MetaPreview) = "${preview.type}:${preview.id}"
+
+    private suspend fun resolveRecentlyWatchedPoster(preview: MetaPreview): String? {
+        val isMovie = preview.type == com.nuvio.tv.domain.model.ContentType.MOVIE
+        val types = if (isMovie) listOf("movie") else listOf("series", "tv")
+        val ids = buildList {
+            add(preview.id)
+            if (preview.id.startsWith("tmdb:")) add(preview.id.substringAfter(':'))
+        }.distinct()
+        for (type in types) for (id in ids) {
+            metaRepository.getCachedMeta(type, id)?.poster?.takeIf(String::isNotBlank)?.let { return it }
         }
-        val meta = (result as? com.nuvio.tv.core.network.NetworkResult.Success<*>)?.data as? Meta
-        return meta?.poster?.takeIf(String::isNotBlank)
+        for (type in types) for (id in ids) {
+            for (allAddons in listOf(false, true)) {
+                val result = kotlinx.coroutines.withTimeoutOrNull(RECENTLY_WATCHED_POSTER_TIMEOUT_MS) {
+                    val metaFlow = if (allAddons) {
+                        metaRepository.getMetaFromAllAddons(type = type, id = id)
+                    } else {
+                        metaRepository.getMetaFromPrimaryAddon(type = type, id = id)
+                    }
+                    metaFlow.first { it !is com.nuvio.tv.core.network.NetworkResult.Loading }
+                }
+                val poster = ((result as? com.nuvio.tv.core.network.NetworkResult.Success<*>)?.data as? Meta)
+                    ?.poster?.takeIf(String::isNotBlank)
+                if (poster != null) return poster
+                android.util.Log.d(
+                    "RecentlyWatched",
+                    "poster lookup miss type=$type id=$id allAddons=$allAddons " +
+                        "result=${result?.javaClass?.simpleName ?: "timeout"}"
+                )
+            }
+        }
+        android.util.Log.w("RecentlyWatched", "no poster for ${preview.type} ${preview.id} (${preview.name})")
+        return null
     }
 
     /**
@@ -1415,3 +1445,6 @@ class HomeViewModel @Inject constructor(
         super.onCleared()
     }
 }
+
+private const val RECENTLY_WATCHED_POSTER_TIMEOUT_MS = 5_000L
+private const val RECENTLY_WATCHED_POSTER_RETRY_MS = 5L * 60L * 1000L
