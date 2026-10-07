@@ -64,6 +64,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import com.nuvio.tv.data.local.RecentlyWatchedPosterStore
 import com.nuvio.tv.data.local.WatchProgressSource
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
@@ -756,15 +757,39 @@ class HomeViewModel @Inject constructor(
     // their own poster and movies resolve when nothing usable is stored.
     private val recentlyWatchedPosters = ConcurrentHashMap<String, String>()
     private val recentlyWatchedPosterMissAt = ConcurrentHashMap<String, Long>()
+    private val recentlyWatchedPosterStore by lazy { RecentlyWatchedPosterStore(appContext) }
 
     private suspend fun withRecentlyWatchedShowPosters(previews: List<MetaPreview>): List<MetaPreview> {
         val now = System.currentTimeMillis()
+        // Saved posters from earlier launches: fresh ones skip the lookup, stale ones are
+        // refreshed but still shown if the refresh fails.
+        val stalePosters = HashMap<String, String>()
+        var fromSaved = 0
+        withContext(kotlinx.coroutines.Dispatchers.IO) {
+            previews.forEach { preview ->
+                val key = recentlyWatchedPosterKey(preview)
+                if (recentlyWatchedPosters.containsKey(key)) return@forEach
+                val saved = runCatching { recentlyWatchedPosterStore.get(key, now) }.getOrNull() ?: return@forEach
+                if (saved.isFresh) {
+                    recentlyWatchedPosters[key] = saved.posterUrl
+                    fromSaved++
+                } else {
+                    stalePosters[key] = saved.posterUrl
+                }
+            }
+        }
         val unresolved = previews.filter { preview ->
             val key = recentlyWatchedPosterKey(preview)
             val needsLookup = preview.type == com.nuvio.tv.domain.model.ContentType.SERIES ||
                 preview.poster.isNullOrBlank()
             val recentMiss = recentlyWatchedPosterMissAt[key]?.let { now - it < RECENTLY_WATCHED_POSTER_RETRY_MS } == true
             needsLookup && !recentlyWatchedPosters.containsKey(key) && !recentMiss
+        }
+        if (fromSaved > 0 || unresolved.isNotEmpty()) {
+            android.util.Log.d(
+                "RecentlyWatched",
+                "posters: ${previews.size} titles, $fromSaved from saved list, ${unresolved.size} to look up"
+            )
         }
         if (unresolved.isNotEmpty()) {
             val gate = Semaphore(4)
@@ -777,6 +802,9 @@ class HomeViewModel @Inject constructor(
                             if (poster != null) {
                                 recentlyWatchedPosters[key] = poster
                                 recentlyWatchedPosterMissAt.remove(key)
+                                withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                    runCatching { recentlyWatchedPosterStore.put(key, poster, System.currentTimeMillis()) }
+                                }
                             } else {
                                 recentlyWatchedPosterMissAt[key] = System.currentTimeMillis()
                             }
@@ -786,7 +814,8 @@ class HomeViewModel @Inject constructor(
             }
         }
         return previews.map { preview ->
-            recentlyWatchedPosters[recentlyWatchedPosterKey(preview)]?.let { preview.copy(poster = it) } ?: preview
+            val key = recentlyWatchedPosterKey(preview)
+            (recentlyWatchedPosters[key] ?: stalePosters[key])?.let { preview.copy(poster = it) } ?: preview
         }
     }
 
