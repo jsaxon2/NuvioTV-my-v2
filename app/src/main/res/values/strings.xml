@@ -1299,7 +1299,7 @@
     <string name="layout_cw_sort_last_aired">Last Aired</string>
     <string name="layout_cw_sort_last_aired_desc">Show the most recently aired episodes first</string>
     <string name="recently_watched_simkl_title">Recently Watched</string>
-    <string name="recently_watched_simkl_sub">Show a row of shows and movies recently watched on Simkl</string>
+    <string name="recently_watched_simkl_sub">Show a row of shows and movies you recently watched, from your watch progress source (Nuvio Sync or Simkl)</string>
     <string name="recently_watched_simkl_window_title">Recently Watched Window</string>
     <string name="recently_watched_simkl_window_sub">How far back to look for recently watched titles</string>
     <string name="recently_watched_simkl_window_days_value">%1$d days</string>
