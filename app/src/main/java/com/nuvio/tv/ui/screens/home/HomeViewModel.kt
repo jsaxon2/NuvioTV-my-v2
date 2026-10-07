@@ -67,6 +67,9 @@ import kotlinx.coroutines.flow.flowOf
 import com.nuvio.tv.data.local.WatchProgressSource
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.sync.withPermit
 import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
@@ -737,6 +740,51 @@ class HomeViewModel @Inject constructor(
         }
     }
 
+    // Show posters for the Nuvio Sync Recently Watched row, by series id. Episode progress
+    // stores the episode thumbnail as its poster, so shows are re-resolved to their own poster.
+    private val recentlyWatchedShowPosters = ConcurrentHashMap<String, String>()
+    private val recentlyWatchedShowPosterMisses = ConcurrentHashMap.newKeySet<String>()
+
+    private suspend fun withRecentlyWatchedShowPosters(previews: List<MetaPreview>): List<MetaPreview> {
+        val unresolved = previews.filter { preview ->
+            preview.type == com.nuvio.tv.domain.model.ContentType.SERIES &&
+                !recentlyWatchedShowPosters.containsKey(preview.id) &&
+                preview.id !in recentlyWatchedShowPosterMisses
+        }
+        if (unresolved.isNotEmpty()) {
+            val gate = Semaphore(4)
+            kotlinx.coroutines.coroutineScope {
+                unresolved.map { preview ->
+                    async {
+                        gate.withPermit {
+                            val poster = resolveShowPoster(preview.id)
+                            if (poster != null) recentlyWatchedShowPosters[preview.id] = poster
+                            else recentlyWatchedShowPosterMisses.add(preview.id)
+                        }
+                    }
+                }.awaitAll()
+            }
+        }
+        return previews.map { preview ->
+            if (preview.type != com.nuvio.tv.domain.model.ContentType.SERIES) return@map preview
+            recentlyWatchedShowPosters[preview.id]?.let { preview.copy(poster = it) } ?: preview
+        }
+    }
+
+    private suspend fun resolveShowPoster(seriesId: String): String? {
+        metaRepository.getCachedMeta("series", seriesId)?.poster?.takeIf(String::isNotBlank)?.let { return it }
+        val result = kotlinx.coroutines.withTimeoutOrNull(2_500L) {
+            val metaFlow = if (externalMetaPrefetchEnabled) {
+                metaRepository.getMetaFromAllAddons(type = "series", id = seriesId)
+            } else {
+                metaRepository.getMetaFromPrimaryAddon(type = "series", id = seriesId)
+            }
+            metaFlow.first { it !is com.nuvio.tv.core.network.NetworkResult.Loading }
+        }
+        val meta = (result as? com.nuvio.tv.core.network.NetworkResult.Success<*>)?.data as? Meta
+        return meta?.poster?.takeIf(String::isNotBlank)
+    }
+
     /**
      * Recently Watched follows the Watch Progress source: Simkl reads the Simkl library,
      * Nuvio Sync reads Nuvio's own synced progress and watched history. Other sources
@@ -766,11 +814,13 @@ class HomeViewModel @Inject constructor(
                             watchProgressRepository.allProgress,
                             watchProgressRepository.watchedItems
                         ) { progress, watched ->
-                            nuvioSyncRecentlyWatchedPreviews(
-                                progress = progress,
-                                watched = watched,
-                                windowDays = windowDays,
-                                nowEpochMs = System.currentTimeMillis()
+                            withRecentlyWatchedShowPosters(
+                                nuvioSyncRecentlyWatchedPreviews(
+                                    progress = progress,
+                                    watched = watched,
+                                    windowDays = windowDays,
+                                    nowEpochMs = System.currentTimeMillis()
+                                )
                             )
                         }
                         else -> flowOf(emptyList())
