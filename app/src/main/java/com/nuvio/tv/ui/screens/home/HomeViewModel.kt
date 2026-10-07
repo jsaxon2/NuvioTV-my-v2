@@ -63,6 +63,9 @@ import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import com.nuvio.tv.data.local.WatchProgressSource
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import java.util.Collections
@@ -754,24 +757,45 @@ class HomeViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Recently Watched follows the Watch Progress source: Simkl reads the Simkl library,
+     * Nuvio Sync reads Nuvio's own synced progress and watched history. Other sources
+     * (Trakt, MDBList) leave the row empty.
+     */
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     private fun observeRecentlyWatchedSimkl() {
         viewModelScope.launch {
             kotlinx.coroutines.flow.combine(
                 layoutPreferenceDataStore.recentlyWatchedSimklEnabled,
                 layoutPreferenceDataStore.recentlyWatchedSimklWindowDays,
-                simklSyncRepository.state.onStart {
-                    simklSyncRepository.refresh(TrackingRefreshIntent.AUTOMATIC)
+                traktSettingsDataStore.watchProgressSource
+            ) { enabled, windowDays, source -> Triple(enabled, windowDays, source) }
+                .distinctUntilChanged()
+                .flatMapLatest { (enabled, windowDays, source) ->
+                    when {
+                        !enabled -> flowOf(emptyList())
+                        source == WatchProgressSource.SIMKL -> simklSyncRepository.state
+                            .onStart { simklSyncRepository.refresh(TrackingRefreshIntent.AUTOMATIC) }
+                            .map { syncState ->
+                                syncState.snapshot.recentlyWatchedPreviews(
+                                    windowDays = windowDays,
+                                    nowEpochMs = System.currentTimeMillis()
+                                )
+                            }
+                        source == WatchProgressSource.NUVIO_SYNC -> kotlinx.coroutines.flow.combine(
+                            watchProgressRepository.allProgress,
+                            watchProgressRepository.watchedItems
+                        ) { progress, watched ->
+                            nuvioSyncRecentlyWatchedPreviews(
+                                progress = progress,
+                                watched = watched,
+                                windowDays = windowDays,
+                                nowEpochMs = System.currentTimeMillis()
+                            )
+                        }
+                        else -> flowOf(emptyList())
+                    }
                 }
-            ) { enabled, windowDays, syncState ->
-                if (!enabled) {
-                    emptyList()
-                } else {
-                    syncState.snapshot.recentlyWatchedPreviews(
-                        windowDays = windowDays,
-                        nowEpochMs = System.currentTimeMillis()
-                    )
-                }
-            }
                 .distinctUntilChanged()
                 .collect { items ->
                     _uiState.update { it.copy(recentlyWatchedSimklItems = items) }
