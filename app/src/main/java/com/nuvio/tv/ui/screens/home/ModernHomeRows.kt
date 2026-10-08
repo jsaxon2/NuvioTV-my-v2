@@ -958,7 +958,12 @@ internal fun ModernRowSection(
                                 continueWatchingCardStyle = continueWatchingCardStyle,
                                 continueWatchingCornerRadius = continueWatchingCornerRadius,
                                 onFocused = onFocused,
-                                onContinueWatchingClick = onContinueWatchingClick,
+                                // Fork: unaired Upcoming episodes open the details page instead of trying to play.
+                                onContinueWatchingClick = if (row.key == MODERN_UPCOMING_ROW_KEY) {
+                                    { cwItem -> onNavigateToDetail(cwItem.contentId(), cwItem.contentType(), "") }
+                                } else {
+                                    onContinueWatchingClick
+                                },
                                 onShowOptions = onContinueWatchingOptions
                             )
                         }
