@@ -738,14 +738,21 @@ fun PlayerScreen(
                 settle == PauseOnTimeline.Settle.STAY -> Unit
                 settle == PauseOnTimeline.Settle.TIMELINE -> runCatching { progressBarFocusRequester.requestFocus() }
                 returningLayout != null -> {
+                    // Point the remembered button at Play/Pause rather than clearing it: a null
+                    // lastFocused trips the custom deck's recovery, which jumps to More.
                     customFocus.pendingReturn = null
-                    customFocus.lastFocused = null
+                    customFocus.lastFocused = PlayerControlAction.PLAY_PAUSE
                     customFocus.restore(returningLayout, customAvailable)
                 }
                 else -> runCatching { playPauseFocusRequester.requestFocus() }
             }
             v2Focus.pendingReturn = null
         } else if (!uiState.showControls) {
+            // Fork: forget the last button used, so the custom deck's own restore on the
+            // next show lands on Play/Pause straight away.
+            customFocus.pendingReturn = null
+            customFocus.lastFocused = PlayerControlAction.PLAY_PAUSE
+            v2Focus.pendingReturn = null
             // When controls are hidden, let skip intro button take focus if visible
             val skipVisible = uiState.activeSkipInterval != null && !uiState.skipIntervalDismissed
             val nextEpisodeVisible = uiState.postPlayMode is PostPlayMode.AutoPlay
