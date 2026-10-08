@@ -1382,7 +1382,8 @@ internal fun ModernRowSection(
                                 continueWatchingCornerRadius = continueWatchingCornerRadius,
                                 onFocused = onFocused,
                                 onFocusGained = onFocusGained,
-                                onContinueWatchingClick = if (comingUp) openComingUp else onContinueWatchingClick,
+                                // Fork: unaired Upcoming episodes open the details page like Coming up does.
+                                onContinueWatchingClick = if (comingUp || row.key == MODERN_UPCOMING_ROW_KEY) openComingUp else onContinueWatchingClick,
                                 onShowOptions = onContinueWatchingOptions
                             )
                         }
