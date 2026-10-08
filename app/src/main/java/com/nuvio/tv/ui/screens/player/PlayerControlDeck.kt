@@ -106,7 +106,7 @@ internal fun PlayerControlDeck(
             // The focus outline is outside the faded content, so hidden state and selection both remain clear.
             Box(buttonModifier.border(if (moving == action) 2.dp else 1.dp,
                 if (moving == action) Color.Cyan else if (ghost && focused) Color.White else Color.Transparent, RoundedCornerShape(50))) {
-                PlayerStyledControlButton(action, layout.style, playing, label, { onClick(action) }, Modifier.alpha(if (ghost) .4f else 1f))
+                PlayerStyledControlButton(action, layout.style.forGroup(entry.group), playing, label, { onClick(action) }, Modifier.alpha(if (ghost) .4f else 1f))
                 if (action == PlayerControlAction.MORE && moreExpanded && entry.visible && action in available) {
                     PlayerControlMorePopup(layout, available, targets, playing, preview, popupSelected, onClick, onFocused, onMoreDismiss)
                 }
