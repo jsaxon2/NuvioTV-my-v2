@@ -730,7 +730,8 @@ fun GridHomeContent(
                         rowFocusRequester = upcomingRowFocusRequester,
                         listState = upcomingListState,
                         onItemFocused = { lastFocusedUpcomingIndex.intValue = it; activeCwRowKey.value = "upcoming_section" },
-                        onItemClick = onContinueWatchingClick,
+                        // Fork: unaired Upcoming episodes open the details page instead of trying to play.
+                        onItemClick = { item -> onNavigateToDetail(item.contentId(), item.contentType(), "") },
                         onStartFromBeginning = onContinueWatchingStartFromBeginning,
                         showManualPlayOption = showContinueWatchingManualPlayOption,
                         onPlayManually = onContinueWatchingPlayManually,
