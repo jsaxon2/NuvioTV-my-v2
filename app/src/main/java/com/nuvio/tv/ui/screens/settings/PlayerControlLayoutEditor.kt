@@ -211,8 +211,11 @@ internal fun PlayerControlLayoutEditor(
             SettingsDialogActionButton(stringResource(R.string.player_layout_move), { cancelPress(); editor = editor.beginMove(); focusRequest++ },
                 enabled = !saving && editor.canMove, modifier = Modifier.focusRequester(moveFocus))
             SettingsDialogActionButton(stringResource(R.string.player_layout_button_style, stringResource(
-                    if (editor.draft.preview.style == PlayerControlButtonStyle.PREVIOUS) R.string.player_layout_style_previous
-                    else R.string.player_layout_style_labelled)), { cancelPress(); editor = editor.style(PlayerControlButtonStyle.entries[
+                    when (editor.draft.preview.style) {
+                        PlayerControlButtonStyle.PREVIOUS -> R.string.player_layout_style_previous
+                        PlayerControlButtonStyle.LABELLED -> R.string.player_layout_style_labelled
+                        PlayerControlButtonStyle.HYBRID -> R.string.player_layout_style_hybrid
+                    })), { cancelPress(); editor = editor.style(PlayerControlButtonStyle.entries[
                 (editor.draft.preview.style.ordinal + 1) % PlayerControlButtonStyle.entries.size]) },
                 enabled = !saving && !editor.draft.rejected && !editor.moving)
             SettingsDialogActionButton(stringResource(if (moreExpanded) R.string.player_layout_more_expanded else R.string.player_layout_more_collapsed),
