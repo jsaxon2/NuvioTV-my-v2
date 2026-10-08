@@ -8,7 +8,17 @@ enum class PlayerControlAction(val id: String) {
     INFO("info")
 }
 
-enum class PlayerControlButtonStyle(val id: String) { PREVIOUS("previous"), LABELLED("labelled") }
+enum class PlayerControlButtonStyle(val id: String) {
+    PREVIOUS("previous"), LABELLED("labelled"),
+    /** Fork: labelled buttons in the left and centre groups, icons in the right group. */
+    HYBRID("hybrid");
+
+    /** The concrete style a button in [group] renders with. */
+    fun forGroup(group: PlayerControlGroup): PlayerControlButtonStyle = when (this) {
+        HYBRID -> if (group == PlayerControlGroup.RIGHT) PREVIOUS else LABELLED
+        else -> this
+    }
+}
 
 enum class PlayerControlGroup(val id: String) { LEFT("left"), CENTRE("centre"), RIGHT("right") }
 
