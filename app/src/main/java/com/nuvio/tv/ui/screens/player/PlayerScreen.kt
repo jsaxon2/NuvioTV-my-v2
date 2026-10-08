@@ -686,21 +686,17 @@ fun PlayerScreen(
             !uiState.showSubtitleTimingDialog &&
             !uiState.showSpeedDialog && !((isV2 || uiState.controlLayout != null) && uiState.showStreamInfoOverlay)
         ) {
+            // Fork: the controls always come back on Play/Pause, never on the last button
+            // used (V2 pendingReturn / custom-layout lastFocused are deliberately ignored).
             // Let the returning control deck attach after the outgoing panel fades.
-            val returning = if (isV2 && uiState.controlLayout == null) v2Focus.pendingReturn else null
-            if (returning == V2PlayerControl.SPEED) {
-                viewModel.onEvent(PlayerEvent.OnShowMoreDialog)
-            }
             delay(250)
             val returningLayout = uiState.controlLayout
             if (pauseOnTimeline) {
                 runCatching { progressBarFocusRequester.requestFocus() }
             } else if (returningLayout != null) {
+                customFocus.pendingReturn = null
+                customFocus.lastFocused = null
                 customFocus.restore(returningLayout, customAvailable)
-            } else if (returning != null) {
-                // The utility row may have scrolled or been rebuilt while the
-                // panel was open. Let it attach the item before requesting focus.
-                v2Focus.requestedControl = returning
             } else {
                 runCatching { playPauseFocusRequester.requestFocus() }
             }
