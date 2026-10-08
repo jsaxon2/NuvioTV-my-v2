@@ -4132,6 +4132,7 @@
     <string name="player_layout_button_style">Style: %1$s</string>
     <string name="player_layout_style_previous">Icons</string>
     <string name="player_layout_style_labelled">Labels</string>
+    <string name="player_layout_style_hybrid">Hybrid</string>
     <string name="player_layout_preview_movie">Preview: Movie</string>
     <string name="player_layout_preview_episode">Preview: Episode</string>
     <string name="player_layout_in_more">In More actions</string>
