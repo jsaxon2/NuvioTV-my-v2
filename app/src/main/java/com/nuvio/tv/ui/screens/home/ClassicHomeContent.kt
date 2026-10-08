@@ -840,7 +840,8 @@ fun ClassicHomeContent(
                     },
                     title = stringResource(R.string.upcoming_section_title),
                     onItemClick = { item ->
-                        onContinueWatchingClick(item)
+                        // Fork: unaired Upcoming episodes open the details page instead of trying to play.
+                        onNavigateToDetail(item.contentId(), item.contentType(), "")
                     },
                     onStartFromBeginning = onContinueWatchingStartFromBeginning,
                     showManualPlayOption = showContinueWatchingManualPlayOption,
