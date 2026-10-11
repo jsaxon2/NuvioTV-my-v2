@@ -1,5 +1,7 @@
 package com.nuvio.tv.ui.screens.home
 
+import com.nuvio.tv.data.simkl.SimklSyncState
+import com.nuvio.tv.data.simkl.SimklSyncRepository
 import androidx.lifecycle.viewModelScope
 import com.nuvio.tv.core.network.NetworkResult
 import com.nuvio.tv.domain.model.Addon
@@ -317,7 +319,10 @@ class HomeWatchedTitlesPipelineTest {
             prefetchSelectionSupplier = mockk(relaxed = true),
             streamRepository = mockk(relaxed = true),
             trailerSettingsDataStore = mockk(relaxed = true),
-            serverCatalog = mockk { every { addons } returns flowOf(emptyList()); every { artworkUpdates } returns MutableStateFlow(0L) }
+            serverCatalog = mockk { every { addons } returns flowOf(emptyList()); every { artworkUpdates } returns MutableStateFlow(0L) },
+            simklSyncRepository = mockk<SimklSyncRepository>(relaxed = true) {
+                every { state } returns MutableStateFlow(SimklSyncState())
+            }
         )
         viewModel.startupGracePeriodActive = false
         viewModel.currentTmdbSettings = TmdbSettings(enabled = false)
