@@ -93,7 +93,8 @@ class ThemeSettingsViewModel @Inject constructor(
                         customColors = resolveCustomThemeColors(selection.customColors, memberAccess.tier)
                     ),
                     availableAppThemes(entitlements),
-                    memberAccess.tier != null
+                    // Fork: gradient custom themes don't need a supporter tier.
+                    true
                 )
             }
                 .distinctUntilChanged()

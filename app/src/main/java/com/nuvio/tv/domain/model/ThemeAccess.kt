@@ -37,5 +37,6 @@ fun resolveAppTheme(
     }
 }
 
-fun resolveCustomThemeColors(colors: CustomThemeColors, memberTier: MemberTier?): CustomThemeColors =
-    if (memberTier == null) CustomThemeColors.solid(colors.second) else colors
+// Fork: two-colour custom themes are available without a supporter tier.
+@Suppress("UNUSED_PARAMETER")
+fun resolveCustomThemeColors(colors: CustomThemeColors, memberTier: MemberTier?): CustomThemeColors = colors

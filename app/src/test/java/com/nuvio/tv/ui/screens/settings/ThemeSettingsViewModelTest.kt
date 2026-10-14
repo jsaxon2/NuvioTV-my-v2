@@ -51,20 +51,21 @@ class ThemeSettingsViewModelTest {
     }
 
     @Test
-    fun nonMembersSeeAndSaveOnlySingleColorCustomThemes() = runTest {
+    fun nonMembersSeeAndSaveGradientCustomThemes() = runTest {
+        // Fork: gradient custom themes don't need a supporter tier.
         val viewModel = createViewModel()
         runCurrent()
 
         assertTrue(AppTheme.CUSTOM in viewModel.uiState.value.availableThemes)
         assertEquals(AppTheme.CUSTOM, viewModel.uiState.value.selectedTheme)
-        assertEquals(solid, viewModel.uiState.value.customThemeColors)
-        assertFalse(viewModel.uiState.value.customThemeGradientEnabled)
+        assertEquals(gradient, viewModel.uiState.value.customThemeColors)
+        assertTrue(viewModel.uiState.value.customThemeGradientEnabled)
 
         viewModel.onEvent(ThemeSettingsEvent.SaveCustomTheme(gradient))
         runCurrent()
 
-        coVerify(exactly = 1) { store.setCustomTheme(solid) }
-        assertEquals(ThemeSelection(AppTheme.CUSTOM, solid), selection.value)
+        coVerify(exactly = 1) { store.setCustomTheme(gradient) }
+        assertEquals(ThemeSelection(AppTheme.CUSTOM, gradient), selection.value)
     }
 
     @Test
@@ -85,7 +86,8 @@ class ThemeSettingsViewModelTest {
     }
 
     @Test
-    fun membershipLossKeepsSavedGradientForRenewal() = runTest {
+    fun membershipLossKeepsShowingTheSavedGradient() = runTest {
+        // Fork: gradient custom themes don't need a supporter tier.
         access.value = MemberAccess.preview(MemberTier.SUPPORTER)
         val viewModel = createViewModel()
         runCurrent()
@@ -94,8 +96,8 @@ class ThemeSettingsViewModelTest {
         runCurrent()
 
         assertEquals(AppTheme.CUSTOM, viewModel.uiState.value.selectedTheme)
-        assertEquals(solid, viewModel.uiState.value.customThemeColors)
-        assertFalse(viewModel.uiState.value.customThemeGradientEnabled)
+        assertEquals(gradient, viewModel.uiState.value.customThemeColors)
+        assertTrue(viewModel.uiState.value.customThemeGradientEnabled)
         assertEquals(gradient, selection.value.customColors)
 
         access.value = MemberAccess.preview(MemberTier.SUPPORTER_PLUS)
@@ -107,7 +109,8 @@ class ThemeSettingsViewModelTest {
     }
 
     @Test
-    fun membershipLossBeforeSaveConvertsTheOldEditorDraftToOneColor() = runTest {
+    fun membershipLossBeforeSaveStillSavesTheGradient() = runTest {
+        // Fork: gradient custom themes don't need a supporter tier.
         access.value = MemberAccess.preview(MemberTier.SUPPORTER)
         val viewModel = createViewModel()
         runCurrent()
@@ -116,8 +119,8 @@ class ThemeSettingsViewModelTest {
         viewModel.onEvent(ThemeSettingsEvent.SaveCustomTheme(gradient))
         runCurrent()
 
-        coVerify(exactly = 1) { store.setCustomTheme(solid) }
-        coVerify(exactly = 0) { store.setCustomTheme(gradient) }
+        coVerify(exactly = 1) { store.setCustomTheme(gradient) }
+        coVerify(exactly = 0) { store.setCustomTheme(solid) }
     }
 
     @Test

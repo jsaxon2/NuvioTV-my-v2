@@ -10,6 +10,7 @@ import com.nuvio.tv.data.remote.supabase.MemberAccessRemoteDataSource
 import com.nuvio.tv.domain.model.AuthState
 import com.nuvio.tv.domain.model.MemberAccess
 import com.nuvio.tv.domain.model.MemberTier
+import com.nuvio.tv.domain.model.withLocallyUnlockedCosmetics
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -20,6 +21,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.transformLatest
@@ -99,8 +101,9 @@ class MemberAccessRepository @Inject constructor(
                 emit(MemberAccess.None)
             }
         }
+        .map { it.withLocallyUnlockedCosmetics() }
         .distinctUntilChanged()
-        .stateIn(scope, SharingStarted.Eagerly, initialCachedAccess ?: MemberAccess.None)
+        .stateIn(scope, SharingStarted.Eagerly, (initialCachedAccess ?: MemberAccess.None).withLocallyUnlockedCosmetics())
 
     init {
         if (initialCachedAccess == null) {
