@@ -1012,7 +1012,9 @@ class PluginManager @Inject constructor(
             onFailure = { e -> Log.e(TAG, "Scraper ${scraper.name} failed: ${e.message}") }
         ) {
             scraperSemaphore.withPermit {
-                executeScraper(scraper, tmdbId, mediaType, season, episode)
+                com.nuvio.tv.core.stream.ScraperPlaybackThrottle.run {
+                    executeScraper(scraper, tmdbId, mediaType, season, episode)
+                }
             }
         }
     }
