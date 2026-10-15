@@ -114,6 +114,7 @@ class LayoutPreferenceDataStore @Inject constructor(
     private val blurUnwatchedEpisodesKey = booleanPreferencesKey("blur_unwatched_episodes")
     private val randomEpisodeEnabledKey = booleanPreferencesKey("random_episode_enabled")
     private val recentlyWatchedSimklEnabledKey = booleanPreferencesKey("recently_watched_simkl_enabled")
+    private val screenClockEnabledKey = booleanPreferencesKey("screen_clock_enabled")
     private val recentlyWatchedSimklWindowDaysKey = intPreferencesKey("recently_watched_simkl_window_days")
     private val startupSplashEnabledKey = booleanPreferencesKey("startup_splash_enabled")
     private val alwaysShowLandscapeClearlogoKey = booleanPreferencesKey("always_show_landscape_clearlogo")
@@ -370,6 +371,11 @@ class LayoutPreferenceDataStore @Inject constructor(
 
     val recentlyWatchedSimklEnabled: Flow<Boolean> = profileFlow { prefs ->
         prefs[recentlyWatchedSimklEnabledKey] ?: false
+    }
+
+    /** Fork: clock pill on Home and the details page. */
+    val screenClockEnabled: Flow<Boolean> = profileFlow { prefs ->
+        prefs[screenClockEnabledKey] ?: true
     }
 
     val recentlyWatchedSimklWindowDays: Flow<Int> = profileFlow { prefs ->
@@ -834,6 +840,12 @@ class LayoutPreferenceDataStore @Inject constructor(
     suspend fun setRandomEpisodeEnabled(enabled: Boolean) {
         store().edit { prefs ->
             prefs[randomEpisodeEnabledKey] = enabled
+        }
+    }
+
+    suspend fun setScreenClockEnabled(enabled: Boolean) {
+        store().edit { prefs ->
+            prefs[screenClockEnabledKey] = enabled
         }
     }
 
