@@ -16,7 +16,7 @@
   .\scripts\install-tvs.ps1 -Devices 192.168.1.50:5555
 #>
 param(
-    [string[]]$Devices = @("192.168.1.12:5555", "192.168.1.50:5555"),
+    [string[]]$Devices = @("192.168.1.12:5555", "192.168.1.50:5555", "192.168.1.194:5555"),
     [string]$Package = "com.nuvio.tv.test.jack",
     [switch]$SkipBuild
 )
