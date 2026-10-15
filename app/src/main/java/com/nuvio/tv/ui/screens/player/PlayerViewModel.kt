@@ -333,9 +333,15 @@ class PlayerViewModel @Inject constructor(
                     sourceName = sourceName
                 )
             },
-            audio = audio?.let { osdAudioLine(it.sampleMimeType, it.channelCount, route) }
+            audio = audio?.let { osdAudio(it.sampleMimeType, it.channelCount, route, sourceName) }
         )
     }
+
+    /** Fork: the user's Fusion badge for each OSD slot, from that slot's candidate tokens. */
+    internal suspend fun osdFusionBadges(tokens: Map<OsdBadgeSlot, List<String>>): Map<OsdBadgeSlot, com.nuvio.tv.domain.model.StreamBadge> =
+        tokens.mapNotNull { (slot, candidates) ->
+            runCatching { streamBadgePresentation.osdBadge(candidates) }.getOrNull()?.let { slot to it }
+        }.toMap()
 
     /**
      * One ~1 Hz sample for the live playback stats overlay.
