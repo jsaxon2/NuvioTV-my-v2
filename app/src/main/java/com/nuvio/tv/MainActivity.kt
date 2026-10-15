@@ -977,6 +977,15 @@ open class MainActivity : ComponentActivity() {
                                 androidx.compose.foundation.layout.Box(modifier = Modifier.fillMaxSize()) {
                                 NuvioNavHost(navController, startDestination, hideBuiltInHeaders = hideHeaders)
                                 FormatCheckHost(navController)
+                                    // Fork: clock pill top-right on Home and the details page.
+                                    val clockRoute = navController.currentBackStackEntryAsState().value?.destination?.route
+                                    if (clockRoute == Screen.Home.route || clockRoute == Screen.Detail.route) {
+                                        com.nuvio.tv.ui.components.ScreenClockPill(
+                                            Modifier
+                                                .align(Alignment.TopEnd)
+                                                .padding(top = 18.dp, end = 32.dp)
+                                        )
+                                    }
                                 }
                             }
                         }
