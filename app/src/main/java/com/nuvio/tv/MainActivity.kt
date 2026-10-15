@@ -970,7 +970,8 @@ open class MainActivity : ComponentActivity() {
                                 FormatCheckHost(navController)
                                     // Fork: clock pill top-right on Home and the details page.
                                     val clockRoute = navController.currentBackStackEntryAsState().value?.destination?.route
-                                    if (clockRoute == Screen.Home.route || clockRoute == Screen.Detail.route) {
+                                    val screenClockEnabled by layoutPreferenceDataStore.screenClockEnabled.collectAsState(initial = true)
+                                    if (screenClockEnabled && (clockRoute == Screen.Home.route || clockRoute == Screen.Detail.route)) {
                                         com.nuvio.tv.ui.components.ScreenClockPill(
                                             Modifier
                                                 .align(Alignment.TopEnd)
