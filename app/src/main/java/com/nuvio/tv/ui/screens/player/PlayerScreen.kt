@@ -1994,6 +1994,7 @@ fun PlayerScreen(
 
             // Fork: resolution / HDR / audio line, top-left, shown with the controls.
             val showMediaInfoOverlay = uiState.showControls &&
+                uiState.osdMediaInfoEnabled &&
                 (!isV2 || !uiState.showPlaybackStatsOverlay) &&
                 uiState.error == null &&
                 !uiState.showLoadingOverlay &&
