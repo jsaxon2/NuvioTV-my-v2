@@ -93,7 +93,9 @@ import io.github.peerless2012.ass.media.kt.buildWithAssSupport
 import io.github.peerless2012.ass.media.type.AssRenderType
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
@@ -2058,6 +2060,15 @@ internal fun PlayerRuntimeController.initializePlayer(
                         cancelStartupWatchdog()
                         retractStartupTimeoutErrorAfterFirstFrame()
                         mediaSourceFactory.unlockStartupPrefetch()
+                        // Fork: once the video is up, leftover scrapers take turns unless a sources panel is open.
+                        if (scraperThrottleJob == null) {
+                            scraperThrottleJob = scope.launch {
+                                _uiState
+                                    .map { !it.showSourcesPanel && !it.showEpisodeStreams }
+                                    .distinctUntilChanged()
+                                    .collect { com.nuvio.tv.core.stream.ScraperPlaybackThrottle.setPlaybackActive(it) }
+                            }
+                        }
                         // NuvioTV fork: pre-populate the source list in the
                         // background once playback is healthy, so a mid-play failover
                         // (an unrecoverable malformed hole, or an HTTP dead source) has
