@@ -74,6 +74,7 @@ data class LayoutSettingsUiState(
     val blurUnwatchedEpisodes: Boolean = false,
     val randomEpisodeEnabled: Boolean = false,
     val recentlyWatchedSimklEnabled: Boolean = false,
+    val screenClockEnabled: Boolean = true,
     val recentlyWatchedSimklWindowDays: Int = 30,
     val episodeOptionsOverlayStyle: EpisodeOptionsOverlayStyle = EpisodeOptionsOverlayStyle.BLUR,
     val episodeSynopsisUnderRow: Boolean = true,
@@ -145,6 +146,7 @@ sealed class LayoutSettingsEvent {
     data class SetBlurUnwatchedEpisodes(val enabled: Boolean) : LayoutSettingsEvent()
     data class SetRandomEpisodeEnabled(val enabled: Boolean) : LayoutSettingsEvent()
     data class SetRecentlyWatchedSimklEnabled(val enabled: Boolean) : LayoutSettingsEvent()
+    data class SetScreenClockEnabled(val enabled: Boolean) : LayoutSettingsEvent()
     data class SetRecentlyWatchedSimklWindowDays(val days: Int) : LayoutSettingsEvent()
     data class SetEpisodeOptionsOverlayStyle(val style: EpisodeOptionsOverlayStyle) : LayoutSettingsEvent()
     data class SetEpisodeSynopsisUnderRow(val enabled: Boolean) : LayoutSettingsEvent()
@@ -350,6 +352,11 @@ class LayoutSettingsViewModel @Inject constructor(
             }
         }
         viewModelScope.launch {
+            layoutPreferenceDataStore.screenClockEnabled.distinctUntilChanged().collectLatest { enabled ->
+                updateUiStateIfChanged { it.copy(screenClockEnabled = enabled) }
+            }
+        }
+        viewModelScope.launch {
             layoutPreferenceDataStore.recentlyWatchedSimklEnabled.distinctUntilChanged().collectLatest { enabled ->
                 updateUiStateIfChanged { it.copy(recentlyWatchedSimklEnabled = enabled) }
             }
@@ -516,6 +523,9 @@ class LayoutSettingsViewModel @Inject constructor(
             is LayoutSettingsEvent.SetBlurUnwatchedEpisodes -> setBlurUnwatchedEpisodes(event.enabled)
             is LayoutSettingsEvent.SetRandomEpisodeEnabled -> setRandomEpisodeEnabled(event.enabled)
             is LayoutSettingsEvent.SetRecentlyWatchedSimklEnabled -> setRecentlyWatchedSimklEnabled(event.enabled)
+            is LayoutSettingsEvent.SetScreenClockEnabled -> viewModelScope.launch {
+                layoutPreferenceDataStore.setScreenClockEnabled(event.enabled)
+            }
             is LayoutSettingsEvent.SetRecentlyWatchedSimklWindowDays -> setRecentlyWatchedSimklWindowDays(event.days)
             is LayoutSettingsEvent.SetEpisodeOptionsOverlayStyle -> setEpisodeOptionsOverlayStyle(event.style)
             is LayoutSettingsEvent.SetEpisodeSynopsisUnderRow -> setEpisodeSynopsisUnderRow(event.enabled)
