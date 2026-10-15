@@ -20,14 +20,16 @@ import java.security.MessageDigest
 import java.util.concurrent.Executors
 
 /**
- * Fork: keeps a display-size copy of card artwork that comes from hosts without sized
- * variants (e.g. GitHub-hosted collection art served as full-size images).
+ * Fork: keeps a display-size copy of artwork that is downloaded far larger than it is shown:
+ * card art from hosts without sized variants (e.g. GitHub-hosted collection art) and TMDB
+ * `original` images such as the 4K hero backdrops.
  *
- * Every session, Coil re-decodes the full original from its disk cache to show a small card;
- * on a weak box that is hundreds of milliseconds of CPU per card and it starves scrolling.
- * After the first successful load, the bitmap exactly as displayed is saved losslessly at
- * that size, and later requests decode that copy instead. The picture is unchanged.
- * TMDB artwork is skipped: its URLs are already rewritten to sized variants.
+ * Every session, Coil re-decodes the full original from its disk cache; on a weak box that is
+ * hundreds of milliseconds of CPU per image and it starves scrolling. After the first
+ * successful load, the bitmap as displayed is saved at that size and later requests decode
+ * that copy instead. Opaque art is saved as quality-95 JPEG, which decodes far faster than
+ * lossless formats and looks the same on screen; art with transparency stays lossless.
+ * Sized TMDB variants are skipped: they are already close to display size.
  */
 class DownsizedArtworkInterceptor(context: Context) : Interceptor {
     private val dir = File(context.cacheDir, "downsized_artwork").apply { mkdirs() }
@@ -59,8 +61,9 @@ class DownsizedArtworkInterceptor(context: Context) : Interceptor {
 
         val result = chain.proceed()
         val bitmap = ((result as? SuccessResult)?.image as? BitmapImage)?.bitmap
-        // Decodes can land a few pixels over the target; anything well above it is not a card-size copy.
-        if (bitmap != null && !bitmap.isRecycled && bitmap.width <= width * 5 / 4 && bitmap.height <= height * 5 / 4) {
+        // A cropped (fill) decode overshoots the target on one side only, and decodes can land a few
+        // pixels over it; a bitmap well above the target on both sides is not a display-size copy.
+        if (bitmap != null && !bitmap.isRecycled && (bitmap.width <= width * 5 / 4 || bitmap.height <= height * 5 / 4)) {
             writer.launch { save(bitmap, copy) }
         }
         return result
@@ -68,7 +71,7 @@ class DownsizedArtworkInterceptor(context: Context) : Interceptor {
 
     private fun eligible(url: String, width: Int?, height: Int?): Boolean =
         (url.startsWith("https://") || url.startsWith("http://")) &&
-            !url.startsWith("https://image.tmdb.org/") &&
+            (!url.startsWith("https://image.tmdb.org/") || url.contains("/original/")) &&
             !url.endsWith(".gif", ignoreCase = true) &&
             width != null && height != null && width in 1..MAX_EDGE_PX && height in 1..MAX_EDGE_PX
 
@@ -80,9 +83,13 @@ class DownsizedArtworkInterceptor(context: Context) : Interceptor {
             } else {
                 bitmap
             }
-            val format = if (Build.VERSION.SDK_INT >= 30) Bitmap.CompressFormat.WEBP_LOSSLESS else Bitmap.CompressFormat.PNG
+            val (format, quality) = when {
+                !software.hasAlpha() -> Bitmap.CompressFormat.JPEG to OPAQUE_JPEG_QUALITY
+                Build.VERSION.SDK_INT >= 30 -> Bitmap.CompressFormat.WEBP_LOSSLESS to 100
+                else -> Bitmap.CompressFormat.PNG to 100
+            }
             val temp = File(target.parentFile, target.name + ".tmp")
-            temp.outputStream().use { out -> software.compress(format, 100, out) }
+            temp.outputStream().use { out -> software.compress(format, quality, out) }
             if (software !== bitmap) software.recycle()
             if (!temp.renameTo(target)) temp.delete()
         }
@@ -90,11 +97,17 @@ class DownsizedArtworkInterceptor(context: Context) : Interceptor {
 
     private fun fileName(url: String, width: Int, height: Int): String {
         val digest = MessageDigest.getInstance("SHA-1").digest("$url|$width|$height".toByteArray())
-        return digest.joinToString("") { "%02x".format(it) } + ".webp"
+        return digest.joinToString("") { "%02x".format(it) } + ".img"
+    }
+
+    init {
+        // Copies from the first version were all lossless WebP; they are rewritten as .img.
+        writer.launch { dir.listFiles { file -> file.name.endsWith(".webp") }?.forEach { it.delete() } }
     }
 
     private companion object {
-        const val MAX_EDGE_PX = 800
+        const val MAX_EDGE_PX = 1920
+        const val OPAQUE_JPEG_QUALITY = 95
         const val MAX_AGE_MS = 7L * 24L * 60L * 60L * 1000L
     }
 }
