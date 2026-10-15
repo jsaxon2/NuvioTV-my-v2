@@ -50,6 +50,53 @@ class StreamBadgePresentation @Inject constructor(
         }
     }
 
+    // Fork: player OSD badge lookup, cached per rule set.
+    private val osdBadgeCache = java.util.concurrent.ConcurrentHashMap<String, java.util.Optional<StreamBadge>>()
+    @Volatile private var osdBadgeCacheRules: StreamBadgeRules? = null
+
+    /**
+     * The user's badge for one thing the player is actually playing (e.g. "DDP", "5.1").
+     * Badge rules are written against release names, so each candidate [tokens] entry is placed
+     * into a neutral release name; only badges that appear because of that token count, which
+     * ignores badges the neutral name triggers on its own. Prefers a badge whose name is one of
+     * the tokens. Null when the user has no badge for it.
+     */
+    suspend fun osdBadge(tokens: List<String>): StreamBadge? {
+        if (tokens.isEmpty()) return null
+        val rules = dataStore.settings.first().rules.normalized()
+        val filters = getBadgeFilters(rules)
+        if (filters.isEmpty()) return null
+        if (osdBadgeCacheRules != rules) {
+            osdBadgeCache.clear()
+            osdBadgeCacheRules = rules
+        }
+        return osdBadgeCache.getOrPut(tokens.joinToString("\u0000")) {
+            java.util.Optional.ofNullable(resolveOsdBadge(tokens, filters))
+        }.orElse(null)
+    }
+
+    private fun resolveOsdBadge(tokens: List<String>, filters: List<CompiledStreamBadgeFilter>): StreamBadge? {
+        fun probe(text: String) = Stream(
+            name = null, title = text, description = null, url = null, ytId = null, infoHash = null,
+            fileIdx = null, externalUrl = null, behaviorHints = null, addonName = "", addonLogo = null
+        )
+        fun norm(value: String) = value.lowercase().filterNot { it == ' ' || it == '.' || it == '-' || it == '_' || it == ':' }
+        val baseline = StreamBadgeMatcher.matchedBadges(probe(OSD_PROBE_NAME.format("")), filters)
+            .mapTo(HashSet()) { it.dedupeKey() }
+        val wanted = tokens.mapTo(HashSet(), ::norm)
+        for (token in tokens) {
+            val added = StreamBadgeMatcher.matchedBadges(probe(OSD_PROBE_NAME.format(".$token")), filters)
+                .filter { it.imageURL.isNotBlank() && it.dedupeKey() !in baseline }
+            if (added.isNotEmpty()) return added.firstOrNull { norm(it.name) in wanted } ?: added.first()
+        }
+        return null
+    }
+
+    private companion object {
+        /** A plain release name; "%s" takes ".<token>". */
+        const val OSD_PROBE_NAME = "Movie.Title.2022.WEB-DL%s.x264-NUVIO.mkv"
+    }
+
     suspend fun badgesFor(stream: Stream): List<StreamBadge> {
         val rules = dataStore.settings.first().rules
         val filters = getBadgeFilters(rules)
