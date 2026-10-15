@@ -585,6 +585,8 @@ class PlayerRuntimeController(
 
     internal var playbackStartedForParentalGuide = false
     internal var hasRenderedFirstFrame = false
+    // Fork: keeps ScraperPlaybackThrottle in step with the sources panels while playing.
+    internal var scraperThrottleJob: kotlinx.coroutines.Job? = null
     // Prevent the previous stream's end from completing the new stream.
     internal var endDetectionArmed = false
     // Ignore EOF until MPV has reported a non-EOF state for this stream.
@@ -1074,6 +1076,8 @@ class PlayerRuntimeController(
     }
 
     fun onCleared() {
+        scraperThrottleJob?.cancel()
+        com.nuvio.tv.core.stream.ScraperPlaybackThrottle.setPlaybackActive(false)
         scrubGlideJob?.cancel()
         seekSettleJob?.cancel()
         ScrubGlide.stop()
