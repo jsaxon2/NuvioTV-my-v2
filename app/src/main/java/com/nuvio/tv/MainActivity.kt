@@ -928,7 +928,18 @@ open class MainActivity : ComponentActivity() {
                                 LocalNavViewModelStoreOwner provides navViewModelStoreOwner,
                                 com.nuvio.tv.ui.screens.calendar.LocalCalendarReminderCenter provides calendarReminders
                             ) {
-                                NuvioNavHost(navController, startDestination, hideBuiltInHeaders = hideHeaders)
+                                Box(Modifier.fillMaxSize()) {
+                                    NuvioNavHost(navController, startDestination, hideBuiltInHeaders = hideHeaders)
+                                    // Fork: clock pill top-right on Home and the details page.
+                                    val clockRoute = navController.currentBackStackEntryAsState().value?.destination?.route
+                                    if (clockRoute == Screen.Home.route || clockRoute == Screen.Detail.route) {
+                                        com.nuvio.tv.ui.components.ScreenClockPill(
+                                            Modifier
+                                                .align(Alignment.TopEnd)
+                                                .padding(top = 18.dp, end = 32.dp)
+                                        )
+                                    }
+                                }
                             }
                         }
                     }

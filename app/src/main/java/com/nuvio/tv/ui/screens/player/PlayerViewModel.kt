@@ -306,6 +306,38 @@ class PlayerViewModel @Inject constructor(
     internal suspend fun samplePing(): PlaybackConnectSample? = PlaybackConnectProbe.shared.sample()
 
     /**
+     * Fork: resolution / HDR / audio line for the OSD's top-left corner. Read on the main
+     * thread while the controls are visible. Null on the libmpv engine, which doesn't expose
+     * the same format details.
+     */
+    internal fun sampleOsdMediaInfo(sourceName: String?): PlayerOsdMediaInfo? {
+        val engine = controller.currentInternalPlayerEngine
+        val mpvActive = controller.isUsingMpvEngine() ||
+            (engine == InternalPlayerEngine.AUTO && controller.mpvView != null)
+        if (mpvActive) return null
+        val player = controller.exoPlayer ?: return null
+        val video = player.videoFormat
+        val audio = player.audioFormat
+        if (video == null && audio == null) return null
+        val transfer = video?.let { PlaybackVideoColorTransfer.of(it) }
+        val route = audio?.let {
+            controller.getAudioRoutingSnapshot(isTunnelled = sampleVideoPresentation().isTunnelled)?.mode
+        }
+        return PlayerOsdMediaInfo(
+            resolution = video?.let { osdResolutionLabel(it.width, it.height) },
+            hdr = video?.let {
+                osdHdrFormat(
+                    mimeType = it.sampleMimeType,
+                    isPq = transfer == C.COLOR_TRANSFER_ST2084,
+                    isHlg = transfer == C.COLOR_TRANSFER_HLG,
+                    sourceName = sourceName
+                )
+            },
+            audio = audio?.let { osdAudioLine(it.sampleMimeType, it.channelCount, route) }
+        )
+    }
+
+    /**
      * One ~1 Hz sample for the live playback stats overlay.
      * Called from a main-thread LaunchedEffect in PlayerScreen while the overlay
      * is visible; player state must be read on the application thread.
