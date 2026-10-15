@@ -2097,6 +2097,33 @@ fun PlayerScreen(
                 !uiState.showDisplayModeInfo &&
                 !postPlayRecommendationState.isVisible
 
+            // Fork: resolution / HDR / audio line, top-left, shown with the controls.
+            val showMediaInfoOverlay = uiState.showControls &&
+                (!isV2 || !uiState.showPlaybackStatsOverlay) &&
+                uiState.error == null &&
+                !uiState.showLoadingOverlay &&
+                !uiState.showPauseOverlay &&
+                !uiState.showEpisodesPanel &&
+                !uiState.showSourcesPanel &&
+                !uiState.showAudioOverlay &&
+                !uiState.showSubtitleOverlay &&
+                !uiState.showSubtitleStylePanel &&
+                !uiState.showSpeedDialog &&
+                !uiState.showMoreDialog &&
+                !uiState.showDisplayModeInfo &&
+                !postPlayRecommendationState.isVisible
+            AnimatedVisibility(
+                visible = showMediaInfoOverlay,
+                enter = fadeIn(animationSpec = tween(150)),
+                exit = fadeOut(animationSpec = tween(150)),
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(start = if (isV2) 44.dp else 48.dp, top = NuvioTheme.spacing.xl + 7.dp)
+                    .zIndex(2.15f)
+            ) {
+                PlayerOsdMediaInfoHost(viewModel = viewModel, sourceName = uiState.currentStreamName)
+            }
+
             AnimatedVisibility(
                 visible = showClockOverlay,
                 enter = fadeIn(animationSpec = tween(150)),
@@ -4260,31 +4287,23 @@ private fun PlayerClockOverlay(
         "--:--"
     }
 
-    val clockShadow = playerClockShadow(LocalDensity.current.density)
-    Column(
-        modifier = Modifier
-            .padding(horizontal = NuvioTheme.spacing.xxs, vertical = NuvioTheme.spacing.xxs),
-        horizontalAlignment = Alignment.End
-    ) {
-        Text(
-            text = timeFormatter.format(Date(nowMs)),
-            style = MaterialTheme.typography.bodyMedium.copy(
-                fontSize = PLAYER_CLOCK_FONT_SIZE,
-                fontWeight = FontWeight.SemiBold,
-                shadow = clockShadow
-            ),
-            color = Color.White.copy(alpha = 0.96f)
-        )
-        Text(
-            text = stringResource(R.string.player_ends_at, endTimeText),
-            style = MaterialTheme.typography.bodyMedium.copy(
-                fontSize = PLAYER_ENDS_AT_FONT_SIZE,
-                fontWeight = FontWeight.Medium,
-                shadow = clockShadow
-            ),
-            color = Color.White.copy(alpha = PLAYER_ENDS_AT_ALPHA)
-        )
+    // Fork: clock pill - bold time | muted "ends at".
+    com.nuvio.tv.ui.components.ClockPill(
+        time = timeFormatter.format(Date(nowMs)),
+        trailing = stringResource(R.string.player_osd_ends_at, endTimeText)
+    )
+}
+
+@Composable
+private fun PlayerOsdMediaInfoHost(viewModel: PlayerViewModel, sourceName: String?) {
+    var info by remember { mutableStateOf<PlayerOsdMediaInfo?>(null) }
+    LaunchedEffect(sourceName) {
+        while (true) {
+            info = runCatching { viewModel.sampleOsdMediaInfo(sourceName) }.getOrNull()
+            delay(2_000L)
+        }
     }
+    info?.let { PlayerOsdMediaInfoBar(it) }
 }
 
 @Composable
