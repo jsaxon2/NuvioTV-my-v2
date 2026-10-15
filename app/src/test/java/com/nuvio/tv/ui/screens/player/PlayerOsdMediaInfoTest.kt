@@ -1,6 +1,7 @@
 package com.nuvio.tv.ui.screens.player
 
 import androidx.media3.common.MimeTypes
+import com.nuvio.tv.R
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -25,12 +26,49 @@ class PlayerOsdMediaInfoTest {
         assertNull(osdHdrFormat("video/avc", isPq = false, isHlg = false, sourceName = "HDR10+"))
     }
 
-    @Test fun `audio line shows codec, layout and where it is decoded`() {
-        assertEquals("E-AC-3 5.1 · receiver", osdAudioLine(MimeTypes.AUDIO_E_AC3, 6, AudioRoutingMode.PASSTHROUGH_IEC))
-        assertEquals("TrueHD 7.1 · receiver", osdAudioLine(MimeTypes.AUDIO_TRUEHD, 8, AudioRoutingMode.PASSTHROUGH_DIRECT))
-        assertEquals("DTS 5.1 · AC-3 to receiver", osdAudioLine(MimeTypes.AUDIO_DTS, 6, AudioRoutingMode.TRANSCODE_AC3))
-        assertEquals("AAC 2.0 · decoded", osdAudioLine(MimeTypes.AUDIO_AAC, 2, AudioRoutingMode.PCM))
-        assertEquals("AAC 2.0", osdAudioLine(MimeTypes.AUDIO_AAC, 2, null))
-        assertNull(osdAudioLine(null, 2, null))
+    @Test fun `audio shows codec, atmos, layout and the audio route`() {
+        assertEquals("E-AC-3 5.1 · Passthrough", osdAudio(MimeTypes.AUDIO_E_AC3, 6, AudioRoutingMode.PASSTHROUGH_IEC, null)!!.describe())
+        assertEquals("E-AC-3 Atmos 5.1 · Passthrough", osdAudio(MimeTypes.AUDIO_E_AC3_JOC, 6, AudioRoutingMode.PASSTHROUGH_IEC, null)!!.describe())
+        assertEquals("TrueHD Atmos 7.1 · Passthrough", osdAudio(MimeTypes.AUDIO_TRUEHD, 8, AudioRoutingMode.PASSTHROUGH_DIRECT, "Movie.2160p.TrueHD.Atmos.7.1")!!.describe())
+        assertEquals("TrueHD 7.1 · Passthrough", osdAudio(MimeTypes.AUDIO_TRUEHD, 8, AudioRoutingMode.PASSTHROUGH_DIRECT, "Movie.TrueHD.7.1")!!.describe())
+        assertEquals("DTS 5.1 · AC-3 transcode", osdAudio(MimeTypes.AUDIO_DTS, 6, AudioRoutingMode.TRANSCODE_AC3, null)!!.describe())
+        assertEquals("AAC 2.0 · PCM", osdAudio(MimeTypes.AUDIO_AAC, 2, AudioRoutingMode.PCM, null)!!.describe())
+        assertEquals("AAC 2.0", osdAudio(MimeTypes.AUDIO_AAC, 2, null, null)!!.describe())
+        assertNull(osdAudio(null, 2, null, null))
+    }
+
+    @Test fun `badges match the source list artwork`() {
+        assertEquals(R.drawable.badge_res_2160, osdResolutionBadge("4K"))
+        assertEquals(R.drawable.badge_res_1080, osdResolutionBadge("1080p"))
+        assertEquals(R.drawable.badge_dv, osdHdrBadge(OsdHdrFormat.DOLBY_VISION))
+        assertEquals(R.drawable.badge_hdr10_plus, osdHdrBadge(OsdHdrFormat.HDR10_PLUS))
+        assertEquals(R.drawable.badge_truehd, osdAudioCodecBadge(MimeTypes.AUDIO_TRUEHD, null))
+        assertEquals(R.drawable.badge_ddp, osdAudioCodecBadge(MimeTypes.AUDIO_E_AC3_JOC, null))
+        assertEquals(R.drawable.badge_dts_hd_ma, osdAudioCodecBadge(MimeTypes.AUDIO_DTS_HD, "Movie.DTS-HD.MA.7.1"))
+        assertEquals(R.drawable.badge_dts_hd, osdAudioCodecBadge(MimeTypes.AUDIO_DTS_HD, "Movie.DTS-HD.HRA"))
+        assertNull(osdAudioCodecBadge(MimeTypes.AUDIO_AAC, null))
+        assertEquals(R.drawable.badge_ch_7_1, osdChannelBadge("7.1"))
+        assertNull(osdChannelBadge("2.0"))
+    }
+
+    @Test fun `fusion lookup tokens use release name spellings for each slot`() {
+        val info = PlayerOsdMediaInfo(
+            resolution = "4K",
+            hdr = OsdHdrFormat.DOLBY_VISION,
+            audio = osdAudio(MimeTypes.AUDIO_TRUEHD, 8, AudioRoutingMode.PASSTHROUGH_DIRECT, "TrueHD.Atmos.7.1")
+        )
+        assertEquals(
+            mapOf(
+                OsdBadgeSlot.RESOLUTION to listOf("2160p", "4K", "UHD"),
+                OsdBadgeSlot.HDR to listOf("DV", "DoVi", "Dolby.Vision"),
+                OsdBadgeSlot.CODEC to listOf("TrueHD"),
+                OsdBadgeSlot.ATMOS to listOf("Atmos"),
+                OsdBadgeSlot.CHANNELS to listOf("7.1")
+            ),
+            info.fusionLookupTokens()
+        )
+        val ddp = PlayerOsdMediaInfo(null, null, osdAudio(MimeTypes.AUDIO_E_AC3, 6, null, null)).fusionLookupTokens()
+        assertEquals(listOf("DDP", "DD+", "EAC3"), ddp[OsdBadgeSlot.CODEC])
+        assertEquals(listOf("5.1"), ddp[OsdBadgeSlot.CHANNELS])
     }
 }
