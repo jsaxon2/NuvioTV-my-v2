@@ -169,6 +169,13 @@ internal fun PlaybackPlayerInterfaceSection(
         enabled = internalPlayer
     )
     SettingsToggleRow(
+        title = stringResource(R.string.playback_osd_media_info),
+        subtitle = stringResource(R.string.playback_osd_media_info_sub),
+        checked = settings.osdMediaInfoEnabled,
+        onToggle = { onUpdate { setOsdMediaInfoEnabled(!settings.osdMediaInfoEnabled) } },
+        enabled = internalPlayer
+    )
+    SettingsToggleRow(
         title = stringResource(R.string.playback_parental_guide),
         subtitle = stringResource(R.string.playback_parental_guide_sub),
         checked = settings.parentalGuideEnabled,
