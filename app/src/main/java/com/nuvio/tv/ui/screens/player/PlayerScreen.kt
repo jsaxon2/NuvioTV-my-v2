@@ -2192,7 +2192,7 @@ fun PlayerScreen(
                 exit = fadeOut(animationSpec = tween(150)),
                 modifier = Modifier
                     .align(Alignment.TopStart)
-                    .padding(start = if (isV2) 44.dp else 48.dp, top = NuvioTheme.spacing.xl + 7.dp)
+                    .padding(start = if (isV2) 32.dp else 36.dp, top = NuvioTheme.spacing.xl)
                     .zIndex(2.15f)
             ) {
                 PlayerOsdMediaInfoHost(viewModel = viewModel, sourceName = uiState.currentStreamName)
@@ -4460,13 +4460,24 @@ private fun PlayerClockOverlay(
 @Composable
 private fun PlayerOsdMediaInfoHost(viewModel: PlayerViewModel, sourceName: String?) {
     var info by remember { mutableStateOf<PlayerOsdMediaInfo?>(null) }
+    // Badges resolved for a given set of lookup tokens; the line waits for them so it never
+    // shows a fallback first and then swaps badges in one by one.
+    var resolved by remember {
+        mutableStateOf<Pair<Map<OsdBadgeSlot, List<String>>, Map<OsdBadgeSlot, com.nuvio.tv.domain.model.StreamBadge>>?>(null)
+    }
     LaunchedEffect(sourceName) {
         while (true) {
             info = runCatching { viewModel.sampleOsdMediaInfo(sourceName) }.getOrNull()
             delay(2_000L)
         }
     }
-    info?.let { PlayerOsdMediaInfoBar(it) }
+    val tokens = info?.fusionLookupTokens().orEmpty()
+    LaunchedEffect(tokens) {
+        resolved = tokens to (if (tokens.isEmpty()) emptyMap() else viewModel.osdFusionBadges(tokens))
+    }
+    val current = info
+    val badges = resolved?.takeIf { it.first == tokens }?.second
+    if (current != null && badges != null) PlayerOsdMediaInfoBar(current, fusion = badges)
 }
 
 @Composable
