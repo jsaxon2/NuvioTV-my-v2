@@ -236,6 +236,8 @@ class NuvioApplication : Application(), SingletonImageLoader.Factory {
             .components {
                 add(CustomPosterFallbackInterceptor())
                 add(com.nuvio.tv.core.image.HomePosterLoadingInterceptor(diskDecodeSlots))
+                // Fork: display-size copies of non-TMDB card artwork (see DownsizedArtworkInterceptor).
+                add(com.nuvio.tv.core.image.DownsizedArtworkInterceptor(this@NuvioApplication))
                 // Size-aware TMDB downscaler: the Bingecat catalogue serves original-size
                 // TMDB image URLs (multi-MB, 600-1200ms to decode). Rewrite them to a bucket
                 // matching the resolved display target. Only touches image.tmdb.org
