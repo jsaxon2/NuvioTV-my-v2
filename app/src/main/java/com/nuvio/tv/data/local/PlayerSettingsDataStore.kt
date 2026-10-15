@@ -289,6 +289,8 @@ data class PlayerSettings(
     val pauseOverlayEnabled: Boolean = false,
     val dimHdrOverlays: Boolean = false,
     val osdClockEnabled: Boolean = true,
+    /** Fork: resolution / HDR / audio line top-left in the player OSD. */
+    val osdMediaInfoEnabled: Boolean = true,
     val skipIntroEnabled: Boolean = true,
     val chaptersEnabled: Boolean = true,
     val parentalGuideEnabled: Boolean = true,
@@ -695,6 +697,7 @@ class PlayerSettingsDataStore @Inject constructor(
     private val dimHdrOverlaysKey = booleanPreferencesKey("dim_hdr_overlays")
     private val pauseOverlayEnabledKey = booleanPreferencesKey("pause_overlay_enabled")
     private val osdClockEnabledKey = booleanPreferencesKey("osd_clock_enabled")
+    private val osdMediaInfoEnabledKey = booleanPreferencesKey("osd_media_info_enabled")
     private val skipIntroEnabledKey = booleanPreferencesKey("skip_intro_enabled")
     private val chaptersEnabledKey = booleanPreferencesKey("player_chapters_enabled")
     private val parentalGuideEnabledKey = booleanPreferencesKey("parental_guide_enabled")
@@ -1186,6 +1189,7 @@ class PlayerSettingsDataStore @Inject constructor(
                 pauseOverlayEnabled = prefs[pauseOverlayEnabledKey] ?: false,
                 dimHdrOverlays = prefs[dimHdrOverlaysKey] ?: false,
                 osdClockEnabled = prefs[osdClockEnabledKey] ?: true,
+                osdMediaInfoEnabled = prefs[osdMediaInfoEnabledKey] ?: true,
                 skipIntroEnabled = prefs[skipIntroEnabledKey] ?: true,
                 chaptersEnabled = prefs[chaptersEnabledKey] ?: true,
                 parentalGuideEnabled = prefs[parentalGuideEnabledKey] ?: true,
@@ -1707,6 +1711,12 @@ class PlayerSettingsDataStore @Inject constructor(
     suspend fun setOsdClockEnabled(enabled: Boolean) {
         store().edit { prefs ->
             prefs[osdClockEnabledKey] = enabled
+        }
+    }
+
+    suspend fun setOsdMediaInfoEnabled(enabled: Boolean) {
+        store().edit { prefs ->
+            prefs[osdMediaInfoEnabledKey] = enabled
         }
     }
 

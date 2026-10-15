@@ -820,6 +820,8 @@
     <string name="playback_pause_overlay_sub">Show details overlay after 5 seconds while paused.</string>
     <string name="playback_show_clock_sub">Show current time and end time while controls are visible.</string>
     <string name="playback_osd_clock">OSD clock</string>
+    <string name="playback_osd_media_info">Playing quality &amp; audio</string>
+    <string name="playback_osd_media_info_sub">Show resolution, HDR and the audio format at the top left while controls are visible.</string>
     <string name="playback_skip_intro">Skip intro</string>
     <string name="playback_skip_intro_sub">Use introdb.app to detect intros and recaps.</string>
     <string name="playback_parental_guide">Content warnings</string>
@@ -1266,6 +1268,8 @@
     <string name="layout_cw_sort_last_aired">Last Aired</string>
     <string name="layout_cw_sort_last_aired_desc">Show the most recently aired episodes first</string>
     <string name="recently_watched_simkl_title">Recently Watched</string>
+    <string name="layout_screen_clock">Clock on Home &amp; Details</string>
+    <string name="layout_screen_clock_sub">Show the current time in the top-right corner of Home and the details page.</string>
     <string name="recently_watched_simkl_sub">Show a row of shows and movies you recently watched, from your watch progress source (Nuvio Sync, Trakt or Simkl)</string>
     <string name="recently_watched_simkl_window_title">Recently Watched Window</string>
     <string name="recently_watched_simkl_window_sub">How far back to look for recently watched titles</string>
