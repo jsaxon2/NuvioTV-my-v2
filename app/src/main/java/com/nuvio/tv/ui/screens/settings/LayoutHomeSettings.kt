@@ -195,6 +195,12 @@ internal fun LayoutHomeContentSection(
             }
         )
     }
+    SettingsToggleRow(
+        title = stringResource(R.string.layout_screen_clock),
+        subtitle = stringResource(R.string.layout_screen_clock_sub),
+        checked = uiState.screenClockEnabled,
+        onToggle = { onEvent(LayoutSettingsEvent.SetScreenClockEnabled(!uiState.screenClockEnabled)) }
+    )
 }
 
 @Composable
