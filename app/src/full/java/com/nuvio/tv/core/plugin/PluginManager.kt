@@ -856,7 +856,9 @@ class PluginManager @Inject constructor(
         return coroutineScope {
             val deferred = async {
                 scraperSemaphore.withPermit {
-                    executeScraper(scraper, tmdbId, mediaType, season, episode)
+                    com.nuvio.tv.core.stream.ScraperPlaybackThrottle.run {
+                        executeScraper(scraper, tmdbId, mediaType, season, episode)
+                    }
                 }
             }
             
