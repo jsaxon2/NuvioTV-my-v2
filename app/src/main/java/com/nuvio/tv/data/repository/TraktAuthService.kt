@@ -118,9 +118,13 @@ class TraktAuthService @Inject constructor(
         return BuildConfig.TRAKT_REDIRECT_URI.ifBlank { "urn:ietf:wg:oauth:2.0:oob" }
     }
 
+    // Fork: Trakt apps that sign in with PKCE are issued no client secret, and the device flow
+    // accepts them with the client ID alone; the secret is only sent when one is configured.
     fun hasRequiredCredentials(): Boolean {
-        return BuildConfig.TRAKT_CLIENT_ID.isNotBlank() && BuildConfig.TRAKT_CLIENT_SECRET.isNotBlank()
+        return BuildConfig.TRAKT_CLIENT_ID.isNotBlank()
     }
+
+    private fun traktClientSecret(): String? = BuildConfig.TRAKT_CLIENT_SECRET.ifBlank { null }
 
     suspend fun getCurrentAuthState(): TraktAuthState = traktAuthDataStore.getCurrentState()
 
@@ -214,7 +218,7 @@ class TraktAuthService @Inject constructor(
                 TraktDeviceTokenRequestDto(
                     code = deviceCode,
                     clientId = BuildConfig.TRAKT_CLIENT_ID,
-                    clientSecret = BuildConfig.TRAKT_CLIENT_SECRET
+                    clientSecret = traktClientSecret()
                 )
             )
         } catch (e: IOException) {
@@ -279,7 +283,7 @@ class TraktAuthService @Inject constructor(
                         TraktRefreshTokenRequestDto(
                             refreshToken = refreshToken,
                             clientId = BuildConfig.TRAKT_CLIENT_ID,
-                            clientSecret = BuildConfig.TRAKT_CLIENT_SECRET,
+                            clientSecret = traktClientSecret(),
                             redirectUri = traktRedirectUri()
                         )
                     )
@@ -322,7 +326,7 @@ class TraktAuthService @Inject constructor(
                         TraktRevokeRequestDto(
                             token = accessToken,
                             clientId = BuildConfig.TRAKT_CLIENT_ID,
-                            clientSecret = BuildConfig.TRAKT_CLIENT_SECRET
+                            clientSecret = traktClientSecret()
                         )
                     )
                 }
