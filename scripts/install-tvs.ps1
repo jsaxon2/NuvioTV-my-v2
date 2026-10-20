@@ -14,6 +14,8 @@
   .\scripts\install-tvs.ps1 -SkipBuild
 .EXAMPLE
   .\scripts\install-tvs.ps1 -Devices 192.168.1.50:5555
+.EXAMPLE
+  .\scripts\install-tvs.ps1 -Devices "192.168.1.50:5555,192.168.1.194:5555"
 #>
 param(
     [string[]]$Devices = @("192.168.1.12:5555", "192.168.1.50:5555", "192.168.1.194:5555"),
@@ -22,6 +24,8 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+# With -File, a comma list arrives as one string; split it into separate TVs.
+$Devices = @($Devices | ForEach-Object { $_ -split "[,\s]+" } | Where-Object { $_ })
 $root = Split-Path -Parent $PSScriptRoot
 $apkDir = Join-Path $root "app\build\outputs\apk\full\release"
 
@@ -37,7 +41,8 @@ if (-not $SkipBuild) {
 }
 
 function Get-ApkFor([string]$device) {
-    $abis = (& adb -s $device shell getprop ro.product.cpu.abilist).Trim().Split(",")
+    $abis = "$(& adb -s $device shell getprop ro.product.cpu.abilist)".Trim().Split(",")
+    if (-not $abis[0]) { throw "Could not read the CPU type from $device." }
     foreach ($abi in $abis) {
         $apk = Join-Path $apkDir "app-full-$abi-release.apk"
         if (Test-Path $apk) { return $apk }
@@ -50,21 +55,30 @@ function Get-ApkFor([string]$device) {
 $installed = @()
 foreach ($device in $Devices) {
     Write-Host "`n== $device" -ForegroundColor Cyan
-    & adb connect $device | Out-Null
-    $state = (& adb -s $device get-state 2>$null)
-    if ($state -ne "device") {
-        Write-Host "   Not reachable - skipped. Is the TV on with network debugging enabled?" -ForegroundColor Yellow
-        continue
+    # adb reports problems on stderr; let them through as text so one TV dropping off
+    # the network skips that TV instead of stopping the whole run.
+    $ErrorActionPreference = "Continue"
+    try {
+        & adb connect $device 2>&1 | Out-Null
+        $state = "$(& adb -s $device get-state 2>$null)".Trim()
+        if ($state -ne "device") {
+            Write-Host "   Not reachable - skipped. Is the TV on with network debugging enabled?" -ForegroundColor Yellow
+            continue
+        }
+        $apk = Get-ApkFor $device
+        Write-Host "   Installing $(Split-Path -Leaf $apk)..."
+        $result = (& adb -s $device install -r $apk 2>&1 | Select-Object -Last 1)
+        if ("$result" -notmatch "Success") {
+            Write-Host "   Install failed: $result" -ForegroundColor Red
+            continue
+        }
+        Write-Host "   Installed." -ForegroundColor Green
+        $installed += $device
+    } catch {
+        Write-Host "   Skipped: $($_.Exception.Message)" -ForegroundColor Yellow
+    } finally {
+        $ErrorActionPreference = "Stop"
     }
-    $apk = Get-ApkFor $device
-    Write-Host "   Installing $(Split-Path -Leaf $apk)..."
-    $result = (& adb -s $device install -r $apk 2>&1 | Select-Object -Last 1)
-    if ("$result" -notmatch "Success") {
-        Write-Host "   Install failed: $result" -ForegroundColor Red
-        continue
-    }
-    Write-Host "   Installed." -ForegroundColor Green
-    $installed += $device
 }
 
 if ($installed.Count -eq 0) {
