@@ -2370,7 +2370,13 @@ fun PlayerScreen(
                 !uiState.showDisplayModeInfo &&
                 !postPlayRecommendationState.isVisible
 
-            // Fork: resolution / HDR / audio line, top-left, shown with the controls.
+            // Fork: resolution / HDR / audio line, top-left, shown with the controls. Its content
+            // is kept up to date while the video plays, so it is ready the moment the OSD opens.
+            val osdMediaLine = rememberOsdMediaLine(
+                viewModel = viewModel,
+                sourceName = uiState.currentStreamName,
+                enabled = uiState.osdMediaInfoEnabled
+            )
             val showMediaInfoOverlay = uiState.showControls &&
                 uiState.osdMediaInfoEnabled &&
                 (!isV2 || !uiState.showPlaybackStatsOverlay) &&
@@ -2395,7 +2401,7 @@ fun PlayerScreen(
                     .padding(start = if (isV2) 32.dp else 36.dp, top = NuvioTheme.spacing.xl)
                     .zIndex(2.15f)
             ) {
-                PlayerOsdMediaInfoHost(viewModel = viewModel, sourceName = uiState.currentStreamName)
+                osdMediaLine?.let { (info, badges) -> PlayerOsdMediaInfoBar(info, fusion = badges) }
             }
 
             AnimatedVisibility(
@@ -4669,15 +4675,24 @@ private fun PlayerClockOverlay(
     )
 }
 
+/**
+ * Fork: what the OSD media line shows, sampled every 2 s for as long as the player is open
+ * (not only while the OSD is up), so opening the OSD shows it straight away. Null until the
+ * user's Fusion badges for the current formats are resolved, so the line never shows a
+ * fallback first and then swaps badges in one by one.
+ */
 @Composable
-private fun PlayerOsdMediaInfoHost(viewModel: PlayerViewModel, sourceName: String?) {
+private fun rememberOsdMediaLine(
+    viewModel: PlayerViewModel,
+    sourceName: String?,
+    enabled: Boolean
+): Pair<PlayerOsdMediaInfo, Map<OsdBadgeSlot, com.nuvio.tv.domain.model.StreamBadge>>? {
     var info by remember { mutableStateOf<PlayerOsdMediaInfo?>(null) }
-    // Badges resolved for a given set of lookup tokens; the line waits for them so it never
-    // shows a fallback first and then swaps badges in one by one.
     var resolved by remember {
         mutableStateOf<Pair<Map<OsdBadgeSlot, List<String>>, Map<OsdBadgeSlot, com.nuvio.tv.domain.model.StreamBadge>>?>(null)
     }
-    LaunchedEffect(sourceName) {
+    LaunchedEffect(sourceName, enabled) {
+        if (!enabled) return@LaunchedEffect
         while (true) {
             info = runCatching { viewModel.sampleOsdMediaInfo(sourceName) }.getOrNull()
             delay(2_000L)
@@ -4687,9 +4702,9 @@ private fun PlayerOsdMediaInfoHost(viewModel: PlayerViewModel, sourceName: Strin
     LaunchedEffect(tokens) {
         resolved = tokens to (if (tokens.isEmpty()) emptyMap() else viewModel.osdFusionBadges(tokens))
     }
-    val current = info
-    val badges = resolved?.takeIf { it.first == tokens }?.second
-    if (current != null && badges != null) PlayerOsdMediaInfoBar(current, fusion = badges)
+    val current = info ?: return null
+    val badges = resolved?.takeIf { it.first == tokens }?.second ?: return null
+    return current to badges
 }
 
 @Composable
