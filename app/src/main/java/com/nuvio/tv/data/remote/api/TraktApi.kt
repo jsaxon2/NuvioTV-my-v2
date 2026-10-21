@@ -141,6 +141,15 @@ interface TraktApi {
         @Query("end_at") endAt: String? = null
     ): Response<List<TraktUserEpisodeHistoryItemDto>>
 
+    // Fork: movies and episodes together, newest first, for the Recently Watched row.
+    @GET("sync/history")
+    suspend fun getRecentHistory(
+        @Header("Authorization") authorization: String,
+        @Query("page") page: Int = 1,
+        @Query("limit") limit: Int = 100,
+        @Query("start_at") startAt: String? = null
+    ): Response<List<TraktHistoryItemDto>>
+
     @POST("sync/history")
     suspend fun addHistory(
         @Header("Authorization") authorization: String,
