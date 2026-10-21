@@ -58,6 +58,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
@@ -109,7 +110,8 @@ class HomeViewModel @Inject constructor(
     internal val prefetchSelectionSupplier: com.nuvio.tv.core.stream.PrefetchSelectionSupplier,
     internal val homeRefreshSignal: com.nuvio.tv.core.util.HomeRefreshSignal,
     internal val serverCatalog: ServerCatalog,
-    internal val calendarComingUp: CalendarComingUpSource? = null
+    internal val calendarComingUp: CalendarComingUpSource? = null,
+    internal val traktRecentlyWatched: com.nuvio.tv.data.repository.TraktRecentlyWatchedSource? = null
 ) : ViewModel() {
     companion object {
         internal const val TAG = "HomeViewModel"
@@ -846,8 +848,8 @@ class HomeViewModel @Inject constructor(
 
     /**
      * Recently Watched follows the Watch Progress source: Simkl reads the Simkl library,
-     * Nuvio Sync reads Nuvio's own synced progress and watched history. Other sources
-     * (Trakt, MDBList) leave the row empty.
+     * Nuvio Sync reads Nuvio's own synced progress and watched history, Trakt reads the
+     * Trakt watch history. MDBList leaves the row empty.
      */
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     private fun observeRecentlyWatchedSimkl() {
@@ -882,6 +884,8 @@ class HomeViewModel @Inject constructor(
                                 )
                             )
                         }
+                        source == WatchProgressSource.TRAKT && traktRecentlyWatched != null ->
+                            traktRecentlyWatchedFlow(traktRecentlyWatched, windowDays)
                         else -> flowOf(emptyList())
                     }
                 }
@@ -890,6 +894,39 @@ class HomeViewModel @Inject constructor(
                     _uiState.update { it.copy(recentlyWatchedSimklItems = items) }
                 }
         }
+    }
+
+    /**
+     * Trakt history for the row: fetched when Home starts, again shortly after anything new is
+     * watched (Trakt progress changes), and every [TRAKT_RECENTLY_WATCHED_REFRESH_MS]. A failed
+     * fetch keeps the last list on screen.
+     */
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class, kotlinx.coroutines.FlowPreview::class)
+    private fun traktRecentlyWatchedFlow(
+        source: com.nuvio.tv.data.repository.TraktRecentlyWatchedSource,
+        windowDays: Int
+    ): kotlinx.coroutines.flow.Flow<List<MetaPreview>> {
+        val latestWatch = watchProgressRepository.allProgress
+            .map { progress -> progress.maxOfOrNull { it.lastWatched } ?: 0L }
+            .distinctUntilChanged()
+            .debounce(TRAKT_RECENTLY_WATCHED_SETTLE_MS)
+        val ticker = kotlinx.coroutines.flow.flow {
+            while (true) {
+                emit(System.currentTimeMillis())
+                kotlinx.coroutines.delay(TRAKT_RECENTLY_WATCHED_REFRESH_MS)
+            }
+        }
+        var last: List<MetaPreview>? = null
+        return kotlinx.coroutines.flow.merge(latestWatch, ticker)
+            .conflate()
+            .map {
+                val fetched = runCatching { source.fetch(windowDays) }.getOrNull()
+                if (fetched != null) {
+                    withRecentlyWatchedShowPosters(fetched).also { last = it }
+                } else {
+                    last ?: emptyList()
+                }
+            }
     }
 
     private fun observeBlurUnwatchedEpisodes() {
@@ -1478,3 +1515,6 @@ class HomeViewModel @Inject constructor(
 
 private const val RECENTLY_WATCHED_POSTER_TIMEOUT_MS = 5_000L
 private const val RECENTLY_WATCHED_POSTER_RETRY_MS = 5L * 60L * 1000L
+private const val TRAKT_RECENTLY_WATCHED_REFRESH_MS = 15L * 60L * 1000L
+// Trakt takes a moment to list a just-finished watch; wait for progress changes to settle.
+private const val TRAKT_RECENTLY_WATCHED_SETTLE_MS = 20_000L
