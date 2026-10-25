@@ -180,13 +180,15 @@ internal fun LayoutStreamsSection(
         subtitle = streamBadgeRulesPreview(streamBadgeUiState),
         onClick = onConfigureBadges
     )
-    SettingsToggleRow(
+    // Fork: the player badge row is replaced by the OSD media line, so its switch and pack
+    // choice are hidden (Playback settings has the OSD line's own switch).
+    if (false) SettingsToggleRow(
         title = stringResource(R.string.settings_stream_badges_in_player_title),
         subtitle = stringResource(R.string.settings_stream_badges_in_player_description),
         checked = streamBadgeUiState.showInPlayer,
         onToggle = { onShowInPlayerChange(!streamBadgeUiState.showInPlayer) }
     )
-    if (streamBadgeUiState.showInPlayer && streamBadgeUiState.rules.hasImport) {
+    if (false && streamBadgeUiState.showInPlayer && streamBadgeUiState.rules.hasImport) {
         SettingsActionRow(
             title = stringResource(R.string.settings_stream_player_badges_title),
             subtitle = playerBadgesLabel(streamBadgeUiState),
