@@ -1072,8 +1072,10 @@ class PlayerRuntimeController(
                         showFileSizeBadges = settings.showFileSizeBadges,
                         showAddonLogo = settings.showAddonLogo,
                         streamBadgePlacement = settings.badgePlacement,
-                        showPlayerBadges = settings.showInPlayer,
-                        playerBadgeFilters = if (settings.showInPlayer) {
+                        // Fork: the OSD media line (top-left) shows what is playing instead; the
+                        // badge row under the player title stays off whatever the setting says.
+                        showPlayerBadges = false,
+                        playerBadgeFilters = if (false) {
                             StreamBadgeMatcher.compile(settings.rules.forPlayer(settings.playerBadgeSource))
                         } else {
                             emptyList()
