@@ -1166,8 +1166,10 @@ class PlayerRuntimeController(
                         showFileSizeBadges = settings.showFileSizeBadges,
                         showAddonLogo = settings.showAddonLogo,
                         streamBadgePlacement = settings.badgePlacement,
-                        showPlayerBadges = settings.showInPlayer,
-                        playerBadgeFilters = filters
+                        // Fork: the OSD media line (top-left) shows what is playing instead; the
+                        // badge row under the player title stays off whatever the setting says.
+                        showPlayerBadges = false,
+                        playerBadgeFilters = emptyList()
                     )
                 }
             }
