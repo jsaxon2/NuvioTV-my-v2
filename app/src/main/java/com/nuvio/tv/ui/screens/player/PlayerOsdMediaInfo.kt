@@ -174,7 +174,7 @@ internal fun OsdAudio.describe(): String =
     ).joinToString(" · ")
 
 /** Each badge position in the OSD line; the user's Fusion badge set can supply its artwork. */
-internal enum class OsdBadgeSlot { RESOLUTION, HDR, CODEC, ATMOS, CHANNELS }
+internal enum class OsdBadgeSlot { RESOLUTION, HDR, CODEC, ATMOS, CHANNELS, ROUTE }
 
 /**
  * Candidate words for each slot, spelled the way release names spell them, most typical first.
@@ -206,6 +206,12 @@ internal fun PlayerOsdMediaInfo.fusionLookupTokens(): Map<OsdBadgeSlot, List<Str
         }.let { put(OsdBadgeSlot.CODEC, it) }
         if (a.atmos) put(OsdBadgeSlot.ATMOS, listOf("Atmos"))
         a.channels?.takeIf { it.contains('.') }?.let { put(OsdBadgeSlot.CHANNELS, listOf(it)) }
+        when (a.route) {
+            "Passthrough" -> listOf("Passthrough")
+            // A PCM track already shows its PCM badge as the codec.
+            "PCM" -> listOf("PCM", "LPCM").takeIf { a.codec != "PCM" }
+            else -> null
+        }?.let { put(OsdBadgeSlot.ROUTE, it) }
     }
 }
 
@@ -267,6 +273,7 @@ internal fun PlayerOsdMediaInfoBar(
             val codecBadge = fusion[OsdBadgeSlot.CODEC]
             val atmosBadge = fusion[OsdBadgeSlot.ATMOS].takeIf { audio.atmos }
             val channelBadge = fusion[OsdBadgeSlot.CHANNELS]
+            val routeBadge = fusion[OsdBadgeSlot.ROUTE]
             if (codecBadge != null) StreamImportedBadgeChip(codecBadge)
             if (atmosBadge != null) StreamImportedBadgeChip(atmosBadge)
             if (channelBadge != null) StreamImportedBadgeChip(channelBadge)
@@ -276,10 +283,12 @@ internal fun PlayerOsdMediaInfoBar(
                 "Atmos".takeIf { audio.atmos && atmosBadge == null },
                 audio.channels.takeIf { channelBadge == null }
             ).joinToString(" ")
-            val line = listOfNotNull(text.takeIf { it.isNotBlank() }, audio.route).joinToString(" · ")
+            val route = audio.route.takeIf { routeBadge == null && !(audio.route == "PCM" && audio.codec == "PCM") }
+            val line = listOfNotNull(text.takeIf { it.isNotBlank() }, route).joinToString(" · ")
             if (line.isNotBlank()) {
                 OsdText(if (text.isBlank()) "· $line" else line)
             }
+            if (routeBadge != null) StreamImportedBadgeChip(routeBadge)
         }
     }
 }
