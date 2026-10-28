@@ -63,12 +63,25 @@ class PlayerOsdMediaInfoTest {
                 OsdBadgeSlot.HDR to listOf("DV", "DoVi", "Dolby.Vision"),
                 OsdBadgeSlot.CODEC to listOf("TrueHD"),
                 OsdBadgeSlot.ATMOS to listOf("Atmos"),
-                OsdBadgeSlot.CHANNELS to listOf("7.1")
+                OsdBadgeSlot.CHANNELS to listOf("7.1"),
+                OsdBadgeSlot.ROUTE to listOf("Passthrough")
             ),
             info.fusionLookupTokens()
         )
         val ddp = PlayerOsdMediaInfo(null, null, osdAudio(MimeTypes.AUDIO_E_AC3, 6, null, null)).fusionLookupTokens()
         assertEquals(listOf("DDP", "DD+", "EAC3"), ddp[OsdBadgeSlot.CODEC])
         assertEquals(listOf("5.1"), ddp[OsdBadgeSlot.CHANNELS])
+        assertNull(ddp[OsdBadgeSlot.ROUTE])
+    }
+
+    @Test fun `aac stereo decoded to pcm looks up codec, channels and route`() {
+        val aac = PlayerOsdMediaInfo(null, null, osdAudio(MimeTypes.AUDIO_AAC, 2, AudioRoutingMode.PCM, null)).fusionLookupTokens()
+        assertEquals(listOf("AAC"), aac[OsdBadgeSlot.CODEC])
+        assertEquals(listOf("2.0"), aac[OsdBadgeSlot.CHANNELS])
+        assertEquals(listOf("PCM", "LPCM"), aac[OsdBadgeSlot.ROUTE])
+        // A PCM track doesn't repeat its PCM badge for the route.
+        val pcm = PlayerOsdMediaInfo(null, null, osdAudio(MimeTypes.AUDIO_RAW, 2, AudioRoutingMode.PCM, null)).fusionLookupTokens()
+        assertEquals(listOf("LPCM", "PCM"), pcm[OsdBadgeSlot.CODEC])
+        assertNull(pcm[OsdBadgeSlot.ROUTE])
     }
 }
