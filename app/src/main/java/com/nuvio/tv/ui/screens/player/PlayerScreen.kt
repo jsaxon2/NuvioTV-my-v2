@@ -4626,7 +4626,7 @@ private fun rememberOsdMediaLine(
     LaunchedEffect(sourceName, enabled) {
         if (!enabled) return@LaunchedEffect
         while (true) {
-            info = runCatching { viewModel.sampleOsdMediaInfo(sourceName) }.getOrNull()
+            info = runCatching { viewModel.sampleOsdMediaInfo() }.getOrNull()
             delay(2_000L)
         }
     }
