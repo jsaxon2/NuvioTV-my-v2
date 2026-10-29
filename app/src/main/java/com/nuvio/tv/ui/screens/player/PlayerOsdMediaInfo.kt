@@ -69,12 +69,18 @@ internal fun osdResolutionBadge(label: String?): Int? = when (label) {
 
 /**
  * Dolby Vision comes from the video MIME type and PQ/HLG from the colour transfer. HDR10+
- * dynamic metadata isn't visible in the format, so a PQ stream counts as HDR10+ when the
- * source name says so (the same signal the source badges use).
+ * dynamic metadata isn't in the format: a PQ stream counts as HDR10+ once the decoder has
+ * returned HDR10+ metadata ([hdr10PlusSeen]). Release names are never consulted, since they
+ * can list several versions.
  */
-internal fun osdHdrFormat(mimeType: String?, isPq: Boolean, isHlg: Boolean, sourceName: String?): OsdHdrFormat? = when {
+internal fun osdHdrFormat(
+    mimeType: String?,
+    isPq: Boolean,
+    isHlg: Boolean,
+    hdr10PlusSeen: Boolean = false
+): OsdHdrFormat? = when {
     mimeType?.contains("dolby-vision") == true -> OsdHdrFormat.DOLBY_VISION
-    isPq && sourceName.mentions("""hdr\s*10\s*(\+|plus)""") -> OsdHdrFormat.HDR10_PLUS
+    isPq && hdr10PlusSeen -> OsdHdrFormat.HDR10_PLUS
     isPq -> OsdHdrFormat.HDR10
     isHlg -> OsdHdrFormat.HLG
     else -> null
@@ -88,9 +94,6 @@ internal fun osdHdrBadge(hdr: OsdHdrFormat?): Int? = when (hdr) {
     OsdHdrFormat.HLG -> R.drawable.badge_hdr
     null -> null
 }
-
-private fun String?.mentions(pattern: String): Boolean =
-    this != null && Regex(pattern, RegexOption.IGNORE_CASE).containsMatchIn(this)
 
 internal fun osdAudioCodec(mimeType: String?): String? = when (mimeType) {
     MimeTypes.AUDIO_TRUEHD -> "TrueHD"
@@ -111,22 +114,22 @@ internal fun osdAudioCodec(mimeType: String?): String? = when (mimeType) {
     else -> mimeType.substringAfter('/').uppercase()
 }
 
-/** DTS-HD MA vs HRA isn't in the MIME type, so the source name decides, as on the source list. */
+/** DTS-HD MA vs HRA isn't in the MIME type; [dtsHdMa] comes from the bitstream. */
 @DrawableRes
-internal fun osdAudioCodecBadge(mimeType: String?, sourceName: String?): Int? = when (mimeType) {
+internal fun osdAudioCodecBadge(mimeType: String?, dtsHdMa: Boolean = false): Int? = when (mimeType) {
     MimeTypes.AUDIO_TRUEHD -> R.drawable.badge_truehd
     MimeTypes.AUDIO_DTS_X -> R.drawable.badge_dts_x
-    MimeTypes.AUDIO_DTS_HD -> if (sourceName.mentions("""dts[-. ]?hd[-. ]?ma|\bma\b""")) R.drawable.badge_dts_hd_ma else R.drawable.badge_dts_hd
+    MimeTypes.AUDIO_DTS_HD -> if (dtsHdMa) R.drawable.badge_dts_hd_ma else R.drawable.badge_dts_hd
     MimeTypes.AUDIO_DTS -> R.drawable.badge_dts
     MimeTypes.AUDIO_E_AC3, MimeTypes.AUDIO_E_AC3_JOC -> R.drawable.badge_ddp
     MimeTypes.AUDIO_AC3 -> R.drawable.badge_dd
     else -> null
 }
 
-/** E-AC-3 JOC is Atmos by definition; TrueHD/E-AC-3 Atmos is otherwise only in the source name. */
-internal fun osdIsAtmos(mimeType: String?, sourceName: String?): Boolean = when (mimeType) {
+/** E-AC-3 JOC is Atmos by definition (the extractor reads it from the bitstream); TrueHD says so in its major sync. */
+internal fun osdIsAtmos(mimeType: String?, trueHdAtmos: Boolean = false): Boolean = when (mimeType) {
     MimeTypes.AUDIO_E_AC3_JOC -> true
-    MimeTypes.AUDIO_TRUEHD, MimeTypes.AUDIO_E_AC3 -> sourceName.mentions("""atmos""")
+    MimeTypes.AUDIO_TRUEHD -> trueHdAtmos
     else -> false
 }
 
@@ -155,12 +158,27 @@ internal fun osdAudioRoute(route: AudioRoutingMode?): String? = when (route) {
     null -> null
 }
 
-internal fun osdAudio(mimeType: String?, channelCount: Int, route: AudioRoutingMode?, sourceName: String?): OsdAudio? {
-    val codec = osdAudioCodec(mimeType) ?: return null
+internal fun osdAudio(
+    mimeType: String?,
+    channelCount: Int,
+    route: AudioRoutingMode?,
+    trueHdAtmos: Boolean = false,
+    dtsHd: Boolean = false,
+    dtsHdMa: Boolean = false,
+    dtsX: Boolean = false
+): OsdAudio? {
+    // Matroska labels every DTS track plain DTS; the bitstream says which one it really is.
+    val mime = when {
+        mimeType != MimeTypes.AUDIO_DTS && mimeType != MimeTypes.AUDIO_DTS_HD -> mimeType
+        dtsX -> MimeTypes.AUDIO_DTS_X
+        dtsHd || dtsHdMa -> MimeTypes.AUDIO_DTS_HD
+        else -> mimeType
+    }
+    val codec = osdAudioCodec(mime) ?: return null
     return OsdAudio(
         codec = codec,
-        codecBadge = osdAudioCodecBadge(mimeType, sourceName),
-        atmos = osdIsAtmos(mimeType, sourceName),
+        codecBadge = osdAudioCodecBadge(mime, dtsHdMa),
+        atmos = osdIsAtmos(mime, trueHdAtmos),
         channels = osdChannelLayout(channelCount),
         route = osdAudioRoute(route)
     )
