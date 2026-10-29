@@ -312,10 +312,11 @@ class PlayerViewModel @Inject constructor(
 
     /**
      * Fork: resolution / HDR / audio line for the OSD's top-left corner. Read on the main
-     * thread while the controls are visible. Null on the libmpv engine, which doesn't expose
-     * the same format details.
+     * thread while the controls are visible. Everything comes from the stream itself (formats,
+     * decoder output, audio bitstream), never the release name. Null on the libmpv engine,
+     * which doesn't expose the same format details.
      */
-    internal fun sampleOsdMediaInfo(sourceName: String?): PlayerOsdMediaInfo? {
+    internal fun sampleOsdMediaInfo(): PlayerOsdMediaInfo? {
         val engine = controller.currentInternalPlayerEngine
         val mpvActive = controller.isUsingMpvEngine() ||
             (engine == InternalPlayerEngine.AUTO && controller.mpvView != null)
@@ -335,10 +336,18 @@ class PlayerViewModel @Inject constructor(
                     mimeType = it.sampleMimeType,
                     isPq = transfer == C.COLOR_TRANSFER_ST2084,
                     isHlg = transfer == C.COLOR_TRANSFER_HLG,
-                    sourceName = sourceName
+                    hdr10PlusSeen = VideoDynamicHdr.hdr10PlusSeen
                 )
             },
-            audio = audio?.let { osdAudio(it.sampleMimeType, it.channelCount, route, sourceName) }
+            audio = audio?.let { osdAudio(
+                    it.sampleMimeType,
+                    it.channelCount,
+                    route,
+                    trueHdAtmos = AudioBitstreamFeatures.trueHdAtmos,
+                    dtsHd = AudioBitstreamFeatures.dtsHd,
+                    dtsHdMa = AudioBitstreamFeatures.dtsHdMa,
+                    dtsX = AudioBitstreamFeatures.dtsX
+                ) }
         )
     }
 
@@ -496,6 +505,7 @@ class PlayerViewModel @Inject constructor(
             val hdrFormats = format.hdrFormats()
             val hdr = when {
                 "DV" in hdrFormats -> "Dolby Vision"
+                "HDR10" in hdrFormats && VideoDynamicHdr.hdr10PlusSeen -> "HDR10+ / PQ"
                 "HDR10" in hdrFormats -> "HDR10 / PQ"
                 "HLG" in hdrFormats -> "HLG"
                 format.dynamicRangeKnown() -> "SDR"
