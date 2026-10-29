@@ -1,6 +1,7 @@
 package com.nuvio.tv.ui.screens.player
 
 import android.media.MediaFormat
+import android.os.Build
 import android.util.Log
 import androidx.media3.common.Format
 import androidx.media3.common.MimeTypes
@@ -66,7 +67,26 @@ internal class DecodeOrderPtsVideoRenderer(
             loggedEngage = false
         }
         inputFormat = format
+        // Fork: a new stream starts unknown; HDR10+ shows up again with its first metadata.
+        VideoDynamicHdr.hdr10PlusSeen = false
         return evaluation
+    }
+
+    // Fork: decoders hand HDR10+ (ST 2094-40) metadata back on the output format, so this is
+    // where a stream proves it is HDR10+ even when its name doesn't say so.
+    override fun onOutputFormatChanged(format: Format, mediaFormat: MediaFormat?) {
+        super.onOutputFormatChanged(format, mediaFormat)
+        if (!VideoDynamicHdr.hdr10PlusSeen && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
+            mediaFormat?.containsKey(MediaFormat.KEY_HDR10_PLUS_INFO) == true &&
+            runCatching { mediaFormat.getByteBuffer(MediaFormat.KEY_HDR10_PLUS_INFO)?.hasRemaining() }.getOrNull() == true
+        ) {
+            VideoDynamicHdr.hdr10PlusSeen = true
+        }
+    }
+
+    override fun onDisabled() {
+        VideoDynamicHdr.hdr10PlusSeen = false
+        super.onDisabled()
     }
 
     override fun onQueueInputBuffer(buffer: DecoderInputBuffer) {
@@ -178,4 +198,10 @@ internal class DecodeOrderPtsVideoRenderer(
         const val KEY_AMLOGIC_AVI_DISCARD = "vendor.is-avi-discard.enable"
         const val LOG_EVERY = 500L
     }
+}
+
+/** Fork: what the video decoder has reported about the current stream's dynamic HDR metadata. */
+internal object VideoDynamicHdr {
+    @Volatile
+    var hdr10PlusSeen: Boolean = false
 }

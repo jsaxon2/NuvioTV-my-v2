@@ -7,6 +7,9 @@ import androidx.media3.common.C
 import androidx.media3.common.Format
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.util.Util
+import androidx.media3.decoder.DecoderInputBuffer
+import androidx.media3.exoplayer.DecoderReuseEvaluation
+import androidx.media3.exoplayer.FormatHolder
 import androidx.media3.exoplayer.RendererCapabilities
 import androidx.media3.exoplayer.audio.AudioRendererEventListener
 import androidx.media3.exoplayer.audio.AudioSink
@@ -34,6 +37,19 @@ internal class PlaybackSpeedAwareAudioRenderer(
     eventListener,
     playbackSpeedAwareAudioSink
 ) {
+
+    // Fork: the OSD reads Atmos / DTS-HD MA from the bitstream, see [AudioBitstreamFeatures].
+    override fun onInputFormatChanged(formatHolder: FormatHolder): DecoderReuseEvaluation? {
+        AudioBitstreamFeatures.onFormat(formatHolder.format?.sampleMimeType)
+        return super.onInputFormatChanged(formatHolder)
+    }
+
+    override fun onQueueInputBuffer(buffer: DecoderInputBuffer) {
+        buffer.data?.let { data ->
+            AudioBitstreamFeatures.inspect(data, 0, if (data.position() > 0) data.position() else data.limit())
+        }
+        super.onQueueInputBuffer(buffer)
+    }
 
     override fun supportsFormat(mediaCodecSelector: MediaCodecSelector, format: Format): Int {
         if (!MimeTypes.isAudio(format.sampleMimeType)) {
