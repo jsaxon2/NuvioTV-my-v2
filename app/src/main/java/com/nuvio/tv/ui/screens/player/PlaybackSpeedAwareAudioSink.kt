@@ -240,6 +240,8 @@ internal class PlaybackSpeedAwareAudioSink(
         encodedAccessUnitCount: Int
     ): Boolean {
         if (isCurrentlyPassthrough) {
+            // Fork: passthrough data skips the decoder, so the OSD's bitstream check reads it here.
+            AudioBitstreamFeatures.inspect(buffer, buffer.position(), buffer.limit())
             monitor.maybeApplyStartThreshold()
             maybeInjectOpenFailure()
         }
