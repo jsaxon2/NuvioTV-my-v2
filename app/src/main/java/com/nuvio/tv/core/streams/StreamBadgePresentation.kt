@@ -93,8 +93,11 @@ class StreamBadgePresentation @Inject constructor(
     }
 
     private companion object {
-        /** A plain release name; "%s" takes ".<token>". */
-        const val OSD_PROBE_NAME = "Movie.Title.2022.WEB-DL%s.x264-NUVIO.mkv"
+        /**
+         * A plain release name; "%s" takes ".<token>". Nothing follows the token but the group, so
+         * rules that look at the next word (DTS skips "DTS.X…" as DTS:X) see nothing to reject.
+         */
+        const val OSD_PROBE_NAME = "Movie.Title.2022.WEB-DL%s-NUVIO.mkv"
     }
 
     suspend fun badgesFor(stream: Stream): List<StreamBadge> {
