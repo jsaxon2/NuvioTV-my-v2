@@ -223,7 +223,11 @@ internal fun PlayerOsdMediaInfo.fusionLookupTokens(): Map<OsdBadgeSlot, List<Str
             else -> listOf(a.codec)
         }.let { put(OsdBadgeSlot.CODEC, it) }
         if (a.atmos) put(OsdBadgeSlot.ATMOS, listOf("Atmos"))
-        a.channels?.takeIf { it.contains('.') }?.let { put(OsdBadgeSlot.CHANNELS, listOf(it)) }
+        when (val channels = a.channels) {
+            "Mono" -> listOf("1.0", "Mono")
+            null -> null
+            else -> listOf(channels).takeIf { channels.contains('.') }
+        }?.let { put(OsdBadgeSlot.CHANNELS, it) }
         when (a.route) {
             "Passthrough" -> listOf("Passthrough")
             // A PCM track already shows its PCM badge as the codec.
