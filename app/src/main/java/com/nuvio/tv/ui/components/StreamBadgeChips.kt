@@ -243,8 +243,9 @@ internal fun StreamImportedBadgeChip(badge: StreamBadge, crossfade: Boolean = fa
             contentDescription = badge.name,
             modifier = Modifier
                 .height(NuvioTheme.spacing.lg)
-                .widthIn(min = 34.dp, max = 92.dp)
-                .clip(BadgeChipShape),
+                // Fork: no rounded clip here; on a 16dp-tall image it cuts into artwork that runs to
+                // its corners (e.g. the "S" of Dolby Digital Plus). The chip itself stays rounded.
+                .widthIn(min = 34.dp, max = 92.dp),
             contentScale = ContentScale.Fit
         )
     }
