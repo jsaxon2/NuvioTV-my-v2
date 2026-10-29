@@ -78,6 +78,9 @@ class PlayerOsdMediaInfoTest {
         val aac = PlayerOsdMediaInfo(null, null, osdAudio(MimeTypes.AUDIO_AAC, 2, AudioRoutingMode.PCM)).fusionLookupTokens()
         assertEquals(listOf("AAC"), aac[OsdBadgeSlot.CODEC])
         assertEquals(listOf("2.0"), aac[OsdBadgeSlot.CHANNELS])
+        val mp3 = PlayerOsdMediaInfo(null, null, osdAudio(MimeTypes.AUDIO_MPEG, 1, null)).fusionLookupTokens()
+        assertEquals(listOf("MP3"), mp3[OsdBadgeSlot.CODEC])
+        assertEquals(listOf("1.0", "Mono"), mp3[OsdBadgeSlot.CHANNELS])
         assertEquals(listOf("PCM", "LPCM"), aac[OsdBadgeSlot.ROUTE])
         // A PCM track doesn't repeat its PCM badge for the route.
         val pcm = PlayerOsdMediaInfo(null, null, osdAudio(MimeTypes.AUDIO_RAW, 2, AudioRoutingMode.PCM)).fusionLookupTokens()
