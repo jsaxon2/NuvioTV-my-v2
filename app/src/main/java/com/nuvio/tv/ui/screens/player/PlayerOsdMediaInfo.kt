@@ -296,8 +296,9 @@ internal fun PlayerOsdMediaInfoBar(
             val atmosBadge = fusion[OsdBadgeSlot.ATMOS].takeIf { audio.atmos }
             val channelBadge = fusion[OsdBadgeSlot.CHANNELS]
             val routeBadge = fusion[OsdBadgeSlot.ROUTE]
-            if (codecBadge != null) StreamImportedBadgeChip(codecBadge)
+            // Atmos leads, then the codec it rides on: "Dolby Atmos · TrueHD".
             if (atmosBadge != null) StreamImportedBadgeChip(atmosBadge)
+            if (codecBadge != null) StreamImportedBadgeChip(codecBadge)
             if (channelBadge != null) StreamImportedBadgeChip(channelBadge)
             // Whatever has no badge is written out, then the route: "TrueHD 7.1 · Passthrough".
             val text = listOfNotNull(
