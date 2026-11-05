@@ -940,7 +940,8 @@ class HomeViewModel @Inject constructor(
     /**
      * Recently Watched follows the Watch Progress source: Simkl reads the Simkl library,
      * Nuvio Sync reads Nuvio's own synced progress and watched history, Trakt reads the
-     * Trakt watch history. MDBList leaves the row empty.
+     * Trakt watch history. MDBList and WeTrakr go through the shared watch progress, which
+     * already follows whichever tracking service is the Watch Progress source.
      */
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     private fun observeRecentlyWatchedSimkl() {
@@ -962,7 +963,9 @@ class HomeViewModel @Inject constructor(
                                     nowEpochMs = System.currentTimeMillis()
                                 )
                             }
-                        source == WatchProgressSource.NUVIO_SYNC -> kotlinx.coroutines.flow.combine(
+                        source == WatchProgressSource.NUVIO_SYNC ||
+                            source == WatchProgressSource.MDBLIST ||
+                            source == WatchProgressSource.WETRAKR -> kotlinx.coroutines.flow.combine(
                             watchProgressRepository.allProgress,
                             watchProgressRepository.watchedItems
                         ) { progress, watched ->
