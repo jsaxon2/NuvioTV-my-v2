@@ -112,9 +112,10 @@ internal class MdbListRatingsLoader(
                     cache[key] = CacheEntry(result, now() + CACHE_TTL_MS)
                     inFlight.remove(key)
                     deferred.complete(result)
-                    if (!result.isEmpty()) {
-                        diskCache?.put("${key.mediaProvider}:${key.mediaType}:${key.mediaId}", result)
-                    }
+                    // Fork: "no ratings" is saved too (for a shorter time, see the disk cache), so
+                    // those titles aren't asked about again every session. Failed requests never
+                    // reach here, so a hit daily limit is not remembered as "no ratings".
+                    diskCache?.put("${key.mediaProvider}:${key.mediaType}:${key.mediaId}", result)
                 }
             }
         } catch (error: Exception) {

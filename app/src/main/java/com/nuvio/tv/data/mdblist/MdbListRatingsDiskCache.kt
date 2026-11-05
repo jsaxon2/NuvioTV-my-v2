@@ -18,7 +18,12 @@ internal class MdbListRatingsDiskCache(
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
     private val now: () -> Long = System::currentTimeMillis
 ) {
-    private data class Entry(val ratings: MDBListRatings, val storedAtMs: Long)
+    private data class Entry(val ratings: MDBListRatings, val storedAtMs: Long) {
+        // Fork: ratings barely move, so they are kept for days; a title MDBList has no ratings for
+        // is remembered for a shorter while, so new releases pick theirs up soon.
+        fun isExpired(nowMs: Long): Boolean =
+            nowMs - storedAtMs > if (ratings.isEmpty()) EMPTY_TTL_MS else TTL_MS
+    }
 
     private val mutex = Mutex()
     private var entries = mutableMapOf<String, Entry>()
@@ -41,15 +46,15 @@ internal class MdbListRatingsDiskCache(
                 if (!file.exists()) { loaded = true; return }
                 val json = JSONObject(file.readText())
                 val map = mutableMapOf<String, Entry>()
-                val cutoff = now() - TTL_MS
+                val nowMs = now()
                 for (key in json.keys()) {
                     val obj = json.optJSONObject(key) ?: continue
-                    val storedAt = obj.optLong("t", 0L)
-                    if (storedAt < cutoff) continue
-                    map[key] = Entry(
+                    val entry = Entry(
                         ratings = parseRatings(obj),
-                        storedAtMs = storedAt
+                        storedAtMs = obj.optLong("t", 0L)
                     )
+                    if (entry.isExpired(nowMs)) continue
+                    map[key] = entry
                 }
                 entries = map
             } catch (_: Exception) { }
@@ -60,7 +65,7 @@ internal class MdbListRatingsDiskCache(
     suspend fun get(key: String): MDBListRatings? {
         if (!loaded) load()
         val entry = entries[key] ?: return null
-        if (now() - entry.storedAtMs > TTL_MS) {
+        if (entry.isExpired(now())) {
             entries.remove(key)
             return null
         }
@@ -86,9 +91,9 @@ internal class MdbListRatingsDiskCache(
         mutex.withLock {
             try {
                 val json = JSONObject()
-                val cutoff = now() - TTL_MS
+                val nowMs = now()
                 for ((key, entry) in entries) {
-                    if (entry.storedAtMs < cutoff) continue
+                    if (entry.isExpired(nowMs)) continue
                     json.put(key, serializeEntry(entry))
                 }
                 val file = cacheFile()
@@ -134,7 +139,8 @@ internal class MdbListRatingsDiskCache(
         if (has(key)) optDouble(key).takeIf { !it.isNaN() } else null
 
     companion object {
-        private const val TTL_MS = 12L * 60L * 60L * 1000L
+        private const val TTL_MS = 7L * 24L * 60L * 60L * 1000L
+        private const val EMPTY_TTL_MS = 2L * 24L * 60L * 60L * 1000L
         private const val SAVE_DEBOUNCE_MS = 2_000L
     }
 }
