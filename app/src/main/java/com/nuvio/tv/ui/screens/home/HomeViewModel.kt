@@ -778,43 +778,44 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    // Posters for the Nuvio Sync Recently Watched row, by "type:id". Episode progress stores the
-    // episode thumbnail as its poster and watched items store none, so shows always resolve to
-    // their own poster and movies resolve when nothing usable is stored.
-    private val recentlyWatchedPosters = ConcurrentHashMap<String, String>()
+    // Artwork for the Recently Watched row, by "type:id". Episode progress stores the episode
+    // thumbnail as its poster and history items carry no backdrop or logo, so each title resolves
+    // its own poster, backdrop (the hero picture) and logo; anything the item already has wins
+    // for the backdrop and logo.
+    private val recentlyWatchedArtwork = ConcurrentHashMap<String, RecentlyWatchedPosterStore.Artwork>()
     private val recentlyWatchedPosterMissAt = ConcurrentHashMap<String, Long>()
     private val recentlyWatchedPosterStore by lazy { RecentlyWatchedPosterStore(appContext) }
 
     private suspend fun withRecentlyWatchedShowPosters(previews: List<MetaPreview>): List<MetaPreview> {
         val now = System.currentTimeMillis()
-        // Saved posters from earlier launches: fresh ones skip the lookup, stale ones are
+        // Saved artwork from earlier launches: fresh entries skip the lookup, stale ones are
         // refreshed but still shown if the refresh fails.
-        val stalePosters = HashMap<String, String>()
+        val staleArtwork = HashMap<String, RecentlyWatchedPosterStore.Artwork>()
         var fromSaved = 0
         withContext(kotlinx.coroutines.Dispatchers.IO) {
             previews.forEach { preview ->
                 val key = recentlyWatchedPosterKey(preview)
-                if (recentlyWatchedPosters.containsKey(key)) return@forEach
+                if (recentlyWatchedArtwork.containsKey(key)) return@forEach
                 val saved = runCatching { recentlyWatchedPosterStore.get(key, now) }.getOrNull() ?: return@forEach
                 if (saved.isFresh) {
-                    recentlyWatchedPosters[key] = saved.posterUrl
+                    recentlyWatchedArtwork[key] = saved.artwork
                     fromSaved++
                 } else {
-                    stalePosters[key] = saved.posterUrl
+                    staleArtwork[key] = saved.artwork
                 }
             }
         }
         val unresolved = previews.filter { preview ->
             val key = recentlyWatchedPosterKey(preview)
             val needsLookup = preview.type == com.nuvio.tv.domain.model.ContentType.SERIES ||
-                preview.poster.isNullOrBlank()
+                preview.poster.isNullOrBlank() || preview.background.isNullOrBlank()
             val recentMiss = recentlyWatchedPosterMissAt[key]?.let { now - it < RECENTLY_WATCHED_POSTER_RETRY_MS } == true
-            needsLookup && !recentlyWatchedPosters.containsKey(key) && !recentMiss
+            needsLookup && !recentlyWatchedArtwork.containsKey(key) && !recentMiss
         }
         if (fromSaved > 0 || unresolved.isNotEmpty()) {
             android.util.Log.d(
                 "RecentlyWatched",
-                "posters: ${previews.size} titles, $fromSaved from saved list, ${unresolved.size} to look up"
+                "artwork: ${previews.size} titles, $fromSaved from saved list, ${unresolved.size} to look up"
             )
         }
         if (unresolved.isNotEmpty()) {
@@ -824,12 +825,12 @@ class HomeViewModel @Inject constructor(
                     async {
                         gate.withPermit {
                             val key = recentlyWatchedPosterKey(preview)
-                            val poster = resolveRecentlyWatchedPoster(preview)
-                            if (poster != null) {
-                                recentlyWatchedPosters[key] = poster
+                            val artwork = resolveRecentlyWatchedArtwork(preview)
+                            if (artwork != null) {
+                                recentlyWatchedArtwork[key] = artwork
                                 recentlyWatchedPosterMissAt.remove(key)
                                 withContext(kotlinx.coroutines.Dispatchers.IO) {
-                                    runCatching { recentlyWatchedPosterStore.put(key, poster, System.currentTimeMillis()) }
+                                    runCatching { recentlyWatchedPosterStore.put(key, artwork, System.currentTimeMillis()) }
                                 }
                             } else {
                                 recentlyWatchedPosterMissAt[key] = System.currentTimeMillis()
@@ -841,21 +842,40 @@ class HomeViewModel @Inject constructor(
         }
         return previews.map { preview ->
             val key = recentlyWatchedPosterKey(preview)
-            (recentlyWatchedPosters[key] ?: stalePosters[key])?.let { preview.copy(poster = it) } ?: preview
+            val artwork = recentlyWatchedArtwork[key] ?: staleArtwork[key] ?: return@map preview
+            preview.copy(
+                poster = artwork.poster ?: preview.poster,
+                background = preview.background?.takeIf(String::isNotBlank) ?: artwork.background,
+                logo = preview.logo?.takeIf(String::isNotBlank) ?: artwork.logo
+            )
         }
     }
 
     private fun recentlyWatchedPosterKey(preview: MetaPreview) = "${preview.type}:${preview.id}"
 
-    private suspend fun resolveRecentlyWatchedPoster(preview: MetaPreview): String? {
+    private fun Meta.recentlyWatchedArtwork(): RecentlyWatchedPosterStore.Artwork? {
+        val artwork = RecentlyWatchedPosterStore.Artwork(
+            poster = poster?.takeIf(String::isNotBlank),
+            background = background?.takeIf(String::isNotBlank),
+            logo = logo?.takeIf(String::isNotBlank)
+        )
+        return artwork.takeIf { it.poster != null || it.background != null }
+    }
+
+    private suspend fun resolveRecentlyWatchedArtwork(preview: MetaPreview): RecentlyWatchedPosterStore.Artwork? {
         val isMovie = preview.type == com.nuvio.tv.domain.model.ContentType.MOVIE
         val types = if (isMovie) listOf("movie") else listOf("series", "tv")
         val ids = buildList {
             add(preview.id)
             if (preview.id.startsWith("tmdb:")) add(preview.id.substringAfter(':'))
         }.distinct()
+        // A cached meta without a backdrop is kept as a fallback while the addons are asked.
+        var partial: RecentlyWatchedPosterStore.Artwork? = null
         for (type in types) for (id in ids) {
-            metaRepository.getCachedMeta(type, id)?.poster?.takeIf(String::isNotBlank)?.let { return it }
+            metaRepository.getCachedMeta(type, id)?.recentlyWatchedArtwork()?.let { artwork ->
+                if (artwork.background != null) return artwork
+                if (partial == null) partial = artwork
+            }
         }
         for (type in types) for (id in ids) {
             for (allAddons in listOf(false, true)) {
@@ -867,18 +887,21 @@ class HomeViewModel @Inject constructor(
                     }
                     metaFlow.first { it !is com.nuvio.tv.core.network.NetworkResult.Loading }
                 }
-                val poster = ((result as? com.nuvio.tv.core.network.NetworkResult.Success<*>)?.data as? Meta)
-                    ?.poster?.takeIf(String::isNotBlank)
-                if (poster != null) return poster
+                val artwork = ((result as? com.nuvio.tv.core.network.NetworkResult.Success<*>)?.data as? Meta)
+                    ?.recentlyWatchedArtwork()
+                if (artwork?.background != null) return artwork
+                if (artwork != null && partial == null) partial = artwork
                 android.util.Log.d(
                     "RecentlyWatched",
-                    "poster lookup miss type=$type id=$id allAddons=$allAddons " +
+                    "artwork lookup miss type=$type id=$id allAddons=$allAddons " +
                         "result=${result?.javaClass?.simpleName ?: "timeout"}"
                 )
             }
         }
-        android.util.Log.w("RecentlyWatched", "no poster for ${preview.type} ${preview.id} (${preview.name})")
-        return null
+        if (partial == null) {
+            android.util.Log.w("RecentlyWatched", "no artwork for ${preview.type} ${preview.id} (${preview.name})")
+        }
+        return partial
     }
 
     /**
