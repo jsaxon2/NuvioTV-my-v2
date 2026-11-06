@@ -16,18 +16,23 @@ internal fun Collection<Pair<Int, Int>>.episodesLeftFrom(season: Int, episode: I
     count { (s, e) -> s > season || (s == season && e >= episode) }.takeIf { it > 0 }
 
 internal fun CwMetaSummary.episodeKeys(): Set<Pair<Int, Int>> =
-    watchableEpisodes().mapNotNullTo(mutableSetOf()) { video ->
-        val s = video.season ?: return@mapNotNullTo null
-        val e = video.episode ?: return@mapNotNullTo null
-        s to e
-    }
+    watchableEpisodes().map { Triple(it.season, it.episode, it.released) }.toEpisodeKeys()
 
 private fun Meta.episodeKeys(): Set<Pair<Int, Int>> =
-    watchableEpisodes().mapNotNullTo(mutableSetOf()) { video ->
-        val s = video.season ?: return@mapNotNullTo null
-        val e = video.episode ?: return@mapNotNullTo null
-        s to e
-    }
+    watchableEpisodes().map { Triple(it.season, it.episode, it.released) }.toEpisodeKeys()
+
+/**
+ * Fork: episodes listed without an air date after the last dated one are announced placeholders ("TBA"), not
+ * episodes to watch, so they are left out; a show whose list carries no dates at all keeps every episode.
+ */
+private fun List<Triple<Int?, Int?, String?>>.toEpisodeKeys(): Set<Pair<Int, Int>> {
+    val episodes = mapNotNull { (s, e, released) -> if (s == null || e == null) null else Triple(s, e, released) }
+        .sortedWith(compareBy({ it.first }, { it.second }))
+    val lastDated = episodes.indexOfLast { !it.third.isNullOrBlank() }
+    return episodes.filterIndexed { index, (_, _, released) ->
+        lastDated < 0 || index <= lastDated || !released.isNullOrBlank()
+    }.mapTo(mutableSetOf()) { (s, e, _) -> s to e }
+}
 
 internal fun CwMetaSummary.episodesLeftFrom(season: Int, episode: Int): Int? =
     episodeKeys().episodesLeftFrom(season, episode)

@@ -24,6 +24,26 @@ class CwEpisodesLeftTest {
     }
 
     @Test
+    fun `undated placeholder episodes after the last dated one are not counted`() {
+        // Chicago Med S12: E5 aired, E6 and E7 dated later, E8 and E9 listed as TBA without a date.
+        val placeholders = summary(
+            episode(12, 4, "2026-10-29"),
+            episode(12, 5, "2026-11-05"),
+            episode(12, 6, "2099-11-12"),
+            episode(12, 7, "2099-11-19"),
+            episode(12, 8, null),
+            episode(12, 9, null)
+        )
+        assertEquals(1, placeholders.episodesLeftFrom(12, 5))
+    }
+
+    @Test
+    fun `a list without any dates keeps every episode`() {
+        val undated = summary(episode(1, 1, null), episode(1, 2, null), episode(1, 3, null))
+        assertEquals(2, undated.episodesLeftFrom(1, 2))
+    }
+
+    @Test
     fun `episodes not aired yet are not counted`() {
         assertNull(show.episodesLeftFrom(2, 4))
     }
@@ -109,7 +129,7 @@ class CwEpisodesLeftTest {
         videos = videos.toList()
     )
 
-    private fun episode(season: Int, ep: Int, released: String) = CwVideoSummary(
+    private fun episode(season: Int, ep: Int, released: String?) = CwVideoSummary(
         id = "tt-show:$season:$ep",
         title = "E$ep",
         released = released,
