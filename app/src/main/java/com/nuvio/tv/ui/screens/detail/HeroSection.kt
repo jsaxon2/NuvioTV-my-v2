@@ -620,6 +620,7 @@ internal fun PlayButton(
     val isV2 = com.nuvio.tv.ui.v2.appearance.LocalV2Appearance.current != null
     val v2Cinematic = com.nuvio.tv.ui.v2.appearance.LocalV2Appearance.current?.visualStyle ==
         com.nuvio.tv.domain.model.VisualStyle.CINEMATIC_GLASS
+    var playFocused by remember { mutableStateOf(false) }
     var longPressTriggered by remember { mutableStateOf(false) }
     val longPressKeyTracker = rememberLongPressKeyTracker()
     val playFallbackLabel = stringResource(R.string.hero_play)
@@ -644,6 +645,7 @@ internal fun PlayButton(
             .nuvioControlSurface(RoundedCornerShape(if (isV2) 8.dp else NuvioTheme.spacing.xxl))
             .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
             .onFocusChanged {
+                playFocused = it.isFocused
                 if (it.hasFocus) com.nuvio.tv.core.performance.DetailEntryTrace.mark("controls_focus", once = true)
                 if (it.isFocused) {
                     onFocusRestored()
@@ -721,7 +723,9 @@ internal fun PlayButton(
     ) {
         // Fork: the theme colour fills the bar; the classic button is that colour itself, so it uses the text colour.
         val resumeFill = if (isV2) NuvioTheme.colors.Secondary else androidx.tv.material3.LocalContentColor.current
-        val resumeTrack = androidx.tv.material3.LocalContentColor.current.copy(alpha = 0.25f)
+        // Focused, the V2 button turns a tint of the theme colour, so a light track would blend into the fill.
+        val resumeTrack = if (playFocused && isV2) Color.Black.copy(alpha = 0.45f)
+            else androidx.tv.material3.LocalContentColor.current.copy(alpha = 0.25f)
         androidx.compose.foundation.layout.Column(
             modifier = Modifier.width(androidx.compose.foundation.layout.IntrinsicSize.Max)
         ) {
