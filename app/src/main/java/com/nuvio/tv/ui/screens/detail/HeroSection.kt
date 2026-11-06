@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -49,6 +50,7 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.draw.clipToBounds
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
@@ -447,6 +449,8 @@ fun HeroContentSection(
                         PlayButton(
                             text = if (isPlayEnabled) nextToWatch?.displayText else stringResource(R.string.playback_unavailable),
                             enabled = isPlayEnabled,
+                            resumeProgress = nextToWatch?.takeIf { it.isResume && isPlayEnabled }
+                                ?.watchProgress?.progressPercentage?.takeIf { it > 0f },
                             onClick = onPlayClick,
                             onLongPress = onPlayLongPress,
                             focusRequester = playButtonFocusRequester,
@@ -606,7 +610,9 @@ internal fun PlayButton(
     onLongPress: (() -> Unit)? = null,
     focusRequester: FocusRequester? = null,
     restoreFocusToken: Int = 0,
-    onFocusRestored: () -> Unit = {}
+    onFocusRestored: () -> Unit = {},
+    /** Fork: how far the resumable episode/movie is watched (0..1); shows a bar inside the button. */
+    resumeProgress: Float? = null
 ) {
     val isV2 = com.nuvio.tv.ui.v2.appearance.LocalV2Appearance.current != null
     val v2Cinematic = com.nuvio.tv.ui.v2.appearance.LocalV2Appearance.current?.visualStyle ==
@@ -700,8 +706,22 @@ internal fun PlayButton(
                 shape = RoundedCornerShape(if (isV2) 8.dp else NuvioTheme.spacing.xxl)
             )
         ),
-        contentPadding = PaddingValues(horizontal = NuvioTheme.spacing.xl, vertical = 14.dp)
+        // Fork: the resume bar takes its room from the bottom padding, so the button keeps its height.
+        contentPadding = if (resumeProgress != null) {
+            PaddingValues(
+                start = NuvioTheme.spacing.xl, end = NuvioTheme.spacing.xl,
+                top = 14.dp, bottom = 14.dp - RESUME_BAR_GAP - RESUME_BAR_HEIGHT
+            )
+        } else {
+            PaddingValues(horizontal = NuvioTheme.spacing.xl, vertical = 14.dp)
+        }
     ) {
+        // Fork: the theme colour fills the bar; the classic button is that colour itself, so it uses the text colour.
+        val resumeFill = if (isV2) NuvioTheme.colors.Secondary else androidx.tv.material3.LocalContentColor.current
+        val resumeTrack = androidx.tv.material3.LocalContentColor.current.copy(alpha = 0.25f)
+        androidx.compose.foundation.layout.Column(
+            modifier = Modifier.width(androidx.compose.foundation.layout.IntrinsicSize.Max)
+        ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.sm),
@@ -728,8 +748,30 @@ internal fun PlayButton(
                 )
             }
         }
+        if (resumeProgress != null) {
+            androidx.compose.foundation.layout.Spacer(Modifier.height(RESUME_BAR_GAP))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(RESUME_BAR_HEIGHT)
+                    .clip(RoundedCornerShape(RESUME_BAR_HEIGHT / 2))
+                    .background(resumeTrack)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(resumeProgress.coerceIn(0f, 1f))
+                        .fillMaxHeight()
+                        .clip(RoundedCornerShape(RESUME_BAR_HEIGHT / 2))
+                        .background(resumeFill)
+                )
+            }
+        }
+        }
     }
 }
+
+private val RESUME_BAR_HEIGHT = 3.dp
+private val RESUME_BAR_GAP = 5.dp
 
 @OptIn(ExperimentalTvMaterial3Api::class, ExperimentalComposeUiApi::class)
 @Composable
