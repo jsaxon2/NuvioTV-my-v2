@@ -111,8 +111,11 @@ class DefaultCalendarRefreshInputs @Inject constructor(
     override val appVisible: StateFlow<Boolean> = appVisibility.visible
     override val settings = settingsStore.settings
     override suspend fun settings(profileId: Int) = settingsStore.current(profileId)
-    override suspend fun followed(profileId: Int, knownIds: Map<String, CalendarIds>) =
+    // Fork: reading every followed title parses dates and links for each one. Home's Coming up row asks for it
+    // from the main thread whenever watch progress changes, which froze the remote on slow boxes (ANR).
+    override suspend fun followed(profileId: Int, knownIds: Map<String, CalendarIds>) = withContext(Dispatchers.Default) {
         sourceReader.read(profileId, settingsStore.current(profileId).followOtherServices, knownIds)
+    }
     override fun traktSignedIn() = trackingProviders.isAuthenticated(TrackingProviderId.TRAKT)
     override suspend fun traktCalendar(today: LocalDate) = traktCalendarClient.myShows(today)
     override suspend fun refreshConcurrency() = deviceTier.refreshConcurrency()
