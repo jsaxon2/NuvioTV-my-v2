@@ -98,7 +98,8 @@ internal enum class EpisodeOverlayActionKind {
     PLAY,
     OPEN_COMMENTS,
     PLAY_MANUALLY,
-    START_FROM_BEGINNING
+    START_FROM_BEGINNING,
+    RESET_PROGRESS
 }
 
 internal fun episodeOverlayActionKinds(
@@ -107,7 +108,8 @@ internal fun episodeOverlayActionKinds(
     showPlayManually: Boolean,
     hasProgress: Boolean,
     isPlayEnabled: Boolean,
-    showWatchedActions: Boolean = true
+    showWatchedActions: Boolean = true,
+    showResetProgress: Boolean = false
 ): List<EpisodeOverlayActionKind> = buildList {
     if (showWatchedActions) {
         add(EpisodeOverlayActionKind.TOGGLE_WATCHED)
@@ -118,6 +120,7 @@ internal fun episodeOverlayActionKinds(
     if (showOpenEpisodeComments) add(EpisodeOverlayActionKind.OPEN_COMMENTS)
     if (showPlayManually && isPlayEnabled) add(EpisodeOverlayActionKind.PLAY_MANUALLY)
     if (hasProgress && isPlayEnabled) add(EpisodeOverlayActionKind.START_FROM_BEGINNING)
+    if (hasProgress && showResetProgress) add(EpisodeOverlayActionKind.RESET_PROGRESS)
 }
 
 internal fun isEpisodeOverlayActionEnabled(
@@ -147,6 +150,8 @@ internal fun EpisodeOptionsOverlay(
     onPlay: () -> Unit,
     isPlayEnabled: Boolean = true,
     onStartFromBeginning: () -> Unit = {},
+    /** Fork: when set, the menu offers Reset progress for an episode that has some. */
+    onResetProgress: (() -> Unit)? = null,
     onOpenEpisodeComments: () -> Unit = {},
     showOpenEpisodeComments: Boolean = false,
     onPlayManually: () -> Unit = {},
@@ -244,7 +249,8 @@ internal fun EpisodeOptionsOverlay(
         showPlayManually = showPlayManually,
         hasProgress = hasProgress,
         isPlayEnabled = isPlayEnabled,
-        showWatchedActions = showWatchedActions
+        showWatchedActions = showWatchedActions,
+        showResetProgress = onResetProgress != null
     ).map { kind ->
         EpisodeOverlayAction(
             label = episodeOverlayActionLabel(kind, isWatched, isSeasonFullyWatched, isPlayEnabled, isCurrentlyPlaying),
@@ -258,6 +264,7 @@ internal fun EpisodeOptionsOverlay(
                 EpisodeOverlayActionKind.OPEN_COMMENTS -> onOpenEpisodeComments
                 EpisodeOverlayActionKind.PLAY_MANUALLY -> onPlayManually
                 EpisodeOverlayActionKind.START_FROM_BEGINNING -> onStartFromBeginning
+                EpisodeOverlayActionKind.RESET_PROGRESS -> onResetProgress ?: {}
             }
         )
     }
@@ -581,6 +588,7 @@ private fun episodeOverlayActionLabel(
     EpisodeOverlayActionKind.OPEN_COMMENTS -> stringResource(R.string.episodes_open_comments)
     EpisodeOverlayActionKind.PLAY_MANUALLY -> stringResource(R.string.play_manually)
     EpisodeOverlayActionKind.START_FROM_BEGINNING -> stringResource(R.string.cw_action_start_from_beginning)
+    EpisodeOverlayActionKind.RESET_PROGRESS -> stringResource(R.string.detail_reset_progress)
 }
 
 @Composable
