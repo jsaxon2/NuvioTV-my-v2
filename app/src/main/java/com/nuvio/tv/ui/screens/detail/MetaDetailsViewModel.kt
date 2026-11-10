@@ -701,6 +701,7 @@ class MetaDetailsViewModel @Inject constructor(
             MetaDetailsEvent.OnRetrySharedTrailer -> retrySharedTrailer()
             MetaDetailsEvent.OnToggleMovieWatched -> toggleMovieWatched()
             is MetaDetailsEvent.OnToggleEpisodeWatched -> toggleEpisodeWatched(event.video)
+            is MetaDetailsEvent.OnResetProgress -> resetProgress(event.season, event.episode)
             is MetaDetailsEvent.OnMarkSeasonWatched -> markSeasonWatched(event.season)
             is MetaDetailsEvent.OnMarkSeasonUnwatched -> markSeasonUnwatched(event.season)
             is MetaDetailsEvent.OnMarkPreviousEpisodesWatched -> markPreviousEpisodesWatched(event.video)
@@ -3068,6 +3069,14 @@ class MetaDetailsViewModel @Inject constructor(
                 )
             }
             _uiState.update { it.copy(isMovieWatchedPending = false) }
+        }
+    }
+
+    /** Fork: forgets how far an episode or the movie was watched, without marking it watched or unwatched. */
+    private fun resetProgress(season: Int?, episode: Int?) {
+        viewModelScope.launch {
+            runCatching { watchProgressRepository.removeProgress(_effectiveContentId.value, season, episode) }
+                .onSuccess { showMessage(localizedContext.getString(R.string.detail_progress_reset)) }
         }
     }
 
