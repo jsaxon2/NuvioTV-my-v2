@@ -215,6 +215,8 @@
     <string name="detail_removed_from_library">Removed from library</string>
     <string name="detail_episode_marked_watched">Episode marked as watched</string>
     <string name="detail_episode_marked_unwatched">Episode marked as unwatched</string>
+    <string name="detail_reset_progress">Reset progress</string>
+    <string name="detail_progress_reset">Progress reset</string>
     <string name="detail_lists_updated">Lists updated</string>
     <string name="detail_movie_marked_watched">Marked as watched</string>
     <string name="detail_movie_marked_unwatched">Marked as unwatched</string>
