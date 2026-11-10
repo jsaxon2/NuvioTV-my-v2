@@ -296,4 +296,10 @@ internal val SETTINGS_SEARCH_ENTRIES: List<SettingsSearchEntry> = listOf(
     SettingsSearchEntry(R.string.backup_restore_phone, R.string.backup_restore_phone_sub, SettingsCategory.BACKUP),
     SettingsSearchEntry(R.string.layout_hero_description_auto_scroll, R.string.layout_hero_description_auto_scroll_sub, SettingsCategory.LAYOUT, layout = LayoutSection.HOME_CONTENT, modes = SettingsSearchModes.ADVANCED),
     SettingsSearchEntry(R.string.playback_release_decoder_on_background, R.string.playback_release_decoder_on_background_sub, SettingsCategory.PLAYBACK, playback = PlaybackSection.PLAYER, modes = SettingsSearchModes.ADVANCED),
+    // Fork: settings added by this fork, so Settings search finds them too.
+    SettingsSearchEntry(R.string.recently_watched_simkl_title, R.string.recently_watched_simkl_sub, SettingsCategory.LAYOUT, layout = LayoutSection.CONTINUE_WATCHING, modes = SettingsSearchModes.ADVANCED, keywords = listOf("history", "trakt", "simkl", "mdblist", "wetrakr")),
+    SettingsSearchEntry(R.string.recently_watched_simkl_window_title, R.string.recently_watched_simkl_window_sub, SettingsCategory.LAYOUT, layout = LayoutSection.CONTINUE_WATCHING, modes = SettingsSearchModes.ADVANCED, keywords = listOf("days", "history")),
+    SettingsSearchEntry(R.string.layout_screen_clock, R.string.layout_screen_clock_sub, SettingsCategory.LAYOUT, layout = LayoutSection.HOME_CONTENT, modes = SettingsSearchModes.ADVANCED, keywords = listOf("time")),
+    SettingsSearchEntry(R.string.playback_osd_media_info, R.string.playback_osd_media_info_sub, SettingsCategory.PLAYBACK, playback = PlaybackSection.PLAYER_INTERFACE, modes = SettingsSearchModes.ADVANCED, keywords = listOf("badges", "hdr", "resolution", "atmos", "fusion")),
+    SettingsSearchEntry(R.string.tmdb_reviews_title, R.string.tmdb_reviews_subtitle, SettingsCategory.INTEGRATION, integration = IntegrationSettingsSection.Tmdb, keywords = listOf("tmdb", "trakt")),
 )
