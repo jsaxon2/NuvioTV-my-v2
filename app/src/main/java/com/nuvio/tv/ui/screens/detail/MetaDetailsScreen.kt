@@ -1020,6 +1020,9 @@ fun MetaDetailsScreen(
                     onToggleEpisodeWatched = { video ->
                         viewModel.onEvent(MetaDetailsEvent.OnToggleEpisodeWatched(video))
                     },
+                    onResetProgress = { season, episode ->
+                        viewModel.onEvent(MetaDetailsEvent.OnResetProgress(season, episode))
+                    },
                     onMarkSeasonWatched = { season ->
                         viewModel.onEvent(MetaDetailsEvent.OnMarkSeasonWatched(season))
                     },
@@ -1327,6 +1330,7 @@ private fun MetaDetailsContent(
     onLibraryLongPress: () -> Unit,
     onToggleMovieWatched: () -> Unit,
     onToggleEpisodeWatched: (Video) -> Unit,
+    onResetProgress: (season: Int?, episode: Int?) -> Unit = { _, _ -> },
     onMarkSeasonWatched: (Int) -> Unit,
     onMarkSeasonUnwatched: (Int) -> Unit,
     onMarkPreviousEpisodesWatched: (Video) -> Unit,
@@ -2773,6 +2777,7 @@ private fun MetaDetailsContent(
                                 },
                                 showManualPlayOption = showManualPlayOption,
                                 onToggleEpisodeWatched = onToggleEpisodeWatched,
+                                onResetEpisodeProgress = { video -> onResetProgress(video.season, video.episode) },
                                 onMarkSeasonWatched = onMarkSeasonWatched,
                                 onMarkSeasonUnwatched = onMarkSeasonUnwatched,
                                 isSeasonFullyWatched = isSeasonFullyWatched(selectedSeason),
@@ -3279,6 +3284,11 @@ private fun MetaDetailsContent(
                 onStartFromBeginning = {
                     showHeroPlayOptionsDialog = false
                     heroPlayStartFromBeginningClick()
+                },
+                showResetProgress = nextToWatch?.isResume == true,
+                onResetProgress = {
+                    showHeroPlayOptionsDialog = false
+                    onResetProgress(nextToWatch?.nextSeason, nextToWatch?.nextEpisode)
                 }
             )
         }
@@ -3493,7 +3503,9 @@ private fun PlayManualOverrideDialog(
     showPlayManually: Boolean = true,
     onPlayManually: () -> Unit,
     showStartFromBeginning: Boolean = false,
-    onStartFromBeginning: () -> Unit = {}
+    onStartFromBeginning: () -> Unit = {},
+    showResetProgress: Boolean = false,
+    onResetProgress: () -> Unit = {}
 ) {
     val primaryFocusRequester = remember { FocusRequester() }
 
@@ -3519,6 +3531,14 @@ private fun PlayManualOverrideDialog(
                 label = stringResource(R.string.cw_action_start_from_beginning),
                 onClick = onStartFromBeginning,
                 focusRequester = if (!showPlayManually) primaryFocusRequester else null
+            )
+        }
+
+        if (showResetProgress) {
+            PanelActionRow(
+                label = stringResource(R.string.detail_reset_progress),
+                onClick = onResetProgress,
+                focusRequester = if (!showPlayManually && !showStartFromBeginning) primaryFocusRequester else null
             )
         }
     }
