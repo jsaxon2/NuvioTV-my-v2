@@ -134,6 +134,8 @@ sealed class MetaDetailsEvent {
     data object OnRetrySharedTrailer : MetaDetailsEvent()
     data object OnToggleMovieWatched : MetaDetailsEvent()
     data class OnToggleEpisodeWatched(val video: Video) : MetaDetailsEvent()
+    /** Fork: clears the saved position of an episode (season/episode) or, with both null, the movie. */
+    data class OnResetProgress(val season: Int?, val episode: Int?) : MetaDetailsEvent()
     data class OnMarkSeasonWatched(val season: Int) : MetaDetailsEvent()
     data class OnMarkSeasonUnwatched(val season: Int) : MetaDetailsEvent()
     data class OnMarkPreviousEpisodesWatched(val video: Video) : MetaDetailsEvent()
