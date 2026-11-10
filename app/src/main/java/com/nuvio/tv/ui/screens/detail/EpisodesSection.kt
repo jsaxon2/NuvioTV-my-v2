@@ -432,6 +432,7 @@ fun EpisodesRow(
     onEpisodeManualPlayClick: (Video) -> Unit = onEpisodeClick,
     onEpisodeStartFromBeginningClick: (Video) -> Unit = onEpisodeClick,
     onToggleEpisodeWatched: (Video) -> Unit,
+    onResetEpisodeProgress: ((Video) -> Unit)? = null,
     showManualPlayOption: Boolean = false,
     onMarkSeasonWatched: (Int) -> Unit = {},
     onMarkSeasonUnwatched: (Int) -> Unit = {},
@@ -677,6 +678,12 @@ fun EpisodesRow(
             onStartFromBeginning = {
                 onEpisodeStartFromBeginningClick(selectedEpisode)
                 optionsEpisode = null
+            },
+            onResetProgress = onResetEpisodeProgress?.let { reset ->
+                {
+                    reset(selectedEpisode)
+                    optionsEpisode = null
+                }
             },
             onOpenEpisodeComments = {
                 onOpenEpisodeComments(selectedEpisode)
