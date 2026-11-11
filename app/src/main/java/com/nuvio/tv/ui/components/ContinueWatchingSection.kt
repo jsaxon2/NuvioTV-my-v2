@@ -1208,6 +1208,14 @@ private fun ContinueWatchingCardText(
     }
 }
 
+/** Fork: Home's Drop show for a Continue watching show; null where the menu doesn't offer it. */
+val LocalCwDropShow = androidx.compose.runtime.staticCompositionLocalOf<((ContinueWatchingItem) -> Unit)?> { null }
+
+private fun ContinueWatchingItem.isShow(): Boolean = when (this) {
+    is ContinueWatchingItem.InProgress -> progress.contentType.lowercase() in setOf("series", "tv", "show")
+    is ContinueWatchingItem.NextUp -> true
+}
+
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 fun ContinueWatchingOptionsDialog(
@@ -1277,6 +1285,18 @@ fun ContinueWatchingOptionsDialog(
             PanelActionRow(
                 label = stringResource(R.string.cw_action_remove),
                 onClick = onRemove
+            )
+        }
+
+        // Fork: marks the show Dropped on the trackers, then clears the card as Remove does.
+        val dropShow = LocalCwDropShow.current
+        if (showRemove && dropShow != null && item.isShow()) {
+            PanelActionRow(
+                label = stringResource(R.string.cw_action_drop_show),
+                onClick = {
+                    dropShow(item)
+                    onRemove()
+                }
             )
         }
 
