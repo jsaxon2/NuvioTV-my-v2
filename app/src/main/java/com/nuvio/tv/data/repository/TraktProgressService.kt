@@ -1467,6 +1467,39 @@ class TraktProgressService @Inject constructor(
         return ids.contains(contentId) || ids.contains(canonical)
     }
 
+    /**
+     * Fork: drops a show on Trakt (hides it under "dropped", the section [currentDroppedShowIds] reads).
+     * True when Trakt took it; the show is hidden here straight away rather than at the next refresh.
+     */
+    suspend fun dropShow(contentId: String): Boolean {
+        val ids = com.nuvio.tv.core.tracking.parseTrackingExternalIds(contentId)
+        val traktIds = com.nuvio.tv.data.remote.dto.trakt.TraktIdsDto(
+            trakt = ids.trakt?.toInt(),
+            imdb = ids.imdb,
+            tmdb = ids.tmdb?.toInt(),
+            tvdb = ids.tvdb?.toIntOrNull()
+        )
+        if (traktIds.trakt == null && traktIds.imdb == null && traktIds.tmdb == null && traktIds.tvdb == null) return false
+        val body = com.nuvio.tv.data.remote.dto.trakt.TraktHiddenShowsRequestDto(
+            listOf(com.nuvio.tv.data.remote.dto.trakt.TraktHiddenShowDto(traktIds))
+        )
+        val response = traktAuthService.executeAuthorizedRequest { authHeader ->
+            traktApi.addHiddenItems(authHeader, "dropped", body)
+        } ?: return false
+        if (!response.isSuccessful) {
+            Log.w(TAG, "dropShow failed code=${response.code()}")
+            return false
+        }
+        val added = runCatching {
+            org.json.JSONObject(response.body()?.string().orEmpty()).optJSONObject("added")?.optInt("shows") ?: 0
+        }.getOrDefault(0)
+        if (added <= 0) return false
+        hiddenProgressShowsMutex.withLock {
+            hiddenProgressShowIds.value = hiddenProgressShowIds.value + contentId + canonicalLookupKey(contentId)
+        }
+        return true
+    }
+
     private suspend fun ensureHiddenProgressShows(force: Boolean) {
         val now = System.currentTimeMillis()
         val ttlMs = 30 * 60_000L // refresh every 30 minutes
