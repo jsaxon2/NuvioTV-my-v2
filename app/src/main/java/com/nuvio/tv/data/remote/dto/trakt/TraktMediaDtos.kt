@@ -3,6 +3,17 @@ package com.nuvio.tv.data.remote.dto.trakt
 import com.squareup.moshi.Json
 import com.squareup.moshi.JsonClass
 
+/** Fork: body for adding shows to a Trakt hidden section, such as "dropped". */
+@JsonClass(generateAdapter = true)
+data class TraktHiddenShowsRequestDto(
+    @Json(name = "shows") val shows: List<TraktHiddenShowDto>
+)
+
+@JsonClass(generateAdapter = true)
+data class TraktHiddenShowDto(
+    @Json(name = "ids") val ids: TraktIdsDto
+)
+
 @JsonClass(generateAdapter = true)
 data class TraktIdsDto(
     @Json(name = "trakt") val trakt: Int? = null,

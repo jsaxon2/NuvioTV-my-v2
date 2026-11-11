@@ -216,6 +216,10 @@
     <string name="detail_episode_marked_watched">Episode marked as watched</string>
     <string name="detail_episode_marked_unwatched">Episode marked as unwatched</string>
     <string name="detail_reset_progress">Reset progress</string>
+    <string name="cw_action_drop_show">Drop show</string>
+    <string name="cw_drop_show_done">Dropped on %1$s</string>
+    <string name="cw_drop_show_failed">Couldn\'t drop it on your trackers; removed from Continue watching</string>
+    <string name="cw_drop_show_no_trackers">No tracker connected; removed from Continue watching</string>
     <string name="detail_progress_reset">Progress reset</string>
     <string name="detail_lists_updated">Lists updated</string>
     <string name="detail_movie_marked_watched">Marked as watched</string>
