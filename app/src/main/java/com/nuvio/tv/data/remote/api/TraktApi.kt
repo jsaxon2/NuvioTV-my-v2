@@ -150,6 +150,14 @@ interface TraktApi {
         @Query("start_at") startAt: String? = null
     ): Response<List<TraktHistoryItemDto>>
 
+    /** Fork: adds shows to a hidden section; "dropped" is Trakt's Drop show. */
+    @POST("users/hidden/{section}")
+    suspend fun addHiddenItems(
+        @Header("Authorization") authorization: String,
+        @Path("section") section: String,
+        @Body body: com.nuvio.tv.data.remote.dto.trakt.TraktHiddenShowsRequestDto
+    ): Response<okhttp3.ResponseBody>
+
     @POST("sync/history")
     suspend fun addHistory(
         @Header("Authorization") authorization: String,

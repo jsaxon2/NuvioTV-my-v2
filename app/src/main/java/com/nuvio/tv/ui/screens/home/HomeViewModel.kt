@@ -113,7 +113,8 @@ class HomeViewModel @Inject constructor(
     internal val serverCatalog: ServerCatalog,
     internal val calendarComingUp: CalendarComingUpSource? = null,
     internal val builtInCatalogs: com.nuvio.tv.core.catalog.BuiltInCatalogs = com.nuvio.tv.core.catalog.BuiltInCatalogs.None,
-    internal val traktRecentlyWatched: com.nuvio.tv.data.repository.TraktRecentlyWatchedSource? = null
+    internal val traktRecentlyWatched: com.nuvio.tv.data.repository.TraktRecentlyWatchedSource? = null,
+    private val trackingDropShow: com.nuvio.tv.core.tracking.TrackingDropShowService? = null
 ) : ViewModel() {
     companion object {
         internal const val TAG = "HomeViewModel"
@@ -1286,6 +1287,29 @@ class HomeViewModel @Inject constructor(
         episode = episode,
         isNextUp = isNextUp
     )
+
+    /** Fork: drops a Continue watching show on the connected trackers; the names it went to, or null with none connected. */
+    suspend fun dropShow(item: ContinueWatchingItem): List<String>? {
+        val service = trackingDropShow ?: return null
+        val (contentId, name, year) = when (item) {
+            is ContinueWatchingItem.InProgress -> Triple(item.progress.contentId, item.progress.name, null)
+            is ContinueWatchingItem.NextUp -> Triple(item.info.contentId, item.info.name, item.info.releaseInfo?.take(4)?.toIntOrNull())
+        }
+        val connected = com.nuvio.tv.core.tracking.TrackingProviderId.entries.any { trackingProviderRegistryConnected(it) }
+        if (!connected) return null
+        return service.dropShow(contentId, name, year).map { it.displayName() }
+    }
+
+    private fun trackingProviderRegistryConnected(id: com.nuvio.tv.core.tracking.TrackingProviderId): Boolean =
+        id != com.nuvio.tv.core.tracking.TrackingProviderId.FLOPPY && trackingDropShow?.isConnected(id) == true
+
+    private fun com.nuvio.tv.core.tracking.TrackingProviderId.displayName(): String = when (this) {
+        com.nuvio.tv.core.tracking.TrackingProviderId.TRAKT -> "Trakt"
+        com.nuvio.tv.core.tracking.TrackingProviderId.SIMKL -> "Simkl"
+        com.nuvio.tv.core.tracking.TrackingProviderId.MDBLIST -> "MDBList"
+        com.nuvio.tv.core.tracking.TrackingProviderId.WETRAKR -> "WeTrakr"
+        com.nuvio.tv.core.tracking.TrackingProviderId.FLOPPY -> "Floppy"
+    }
 
     private fun markContinueWatchingWatched(item: ContinueWatchingItem) {
         if (!item.canMarkWatched()) return
