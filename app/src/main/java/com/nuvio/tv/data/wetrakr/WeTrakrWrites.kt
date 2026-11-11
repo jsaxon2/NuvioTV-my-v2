@@ -429,9 +429,20 @@ class WeTrakrPlanningBatch @javax.inject.Inject constructor(
         }))
     }
 
+    /** Fork: puts a show on WeTrakr's Dropped list, for Continue watching's Drop show. */
+    suspend fun drop(item: com.nuvio.tv.domain.model.LibraryEntryInput): Boolean =
+        write(listOf(item), "/sync/tracking", WeTrakrList.DROPPED) { snapshot, targets ->
+            val dropped = targets.map { (target, entry) ->
+                WeTrakrListEntry(WeTrakrTitle(target.type, target.ids, entry.title, entry.year, entry.poster), Instant.now().toString())
+            }
+            val kept = snapshot.list(WeTrakrList.DROPPED).filterNot { entry -> dropped.any { it.title.ids.matches(entry.title.ids) } }
+            snapshot.copy(lists = snapshot.lists + (WeTrakrList.DROPPED to dropped + kept))
+        }.also { if (it > 0) sync.refreshAsync(com.nuvio.tv.core.tracking.TrackingRefreshIntent.INVALIDATED) } > 0
+
     private suspend fun write(
         items: List<com.nuvio.tv.domain.model.LibraryEntryInput>,
         path: String,
+        list: WeTrakrList = WeTrakrList.PLANNING,
         apply: (WeTrakrSnapshot, List<Pair<WeTrakrTarget, com.nuvio.tv.domain.model.LibraryEntryInput>>) -> WeTrakrSnapshot
     ): Int {
         sync.ensureLoaded()
@@ -440,7 +451,7 @@ class WeTrakrPlanningBatch @javax.inject.Inject constructor(
         if (targets.isEmpty()) return 0
         var missing = 0
         targets.chunked(1_000).forEach { chunk ->
-            missing += notFoundCount(api.post(path, trackingBody(chunk.map { it.first }, WeTrakrList.PLANNING.wireValue).toString(), scope).body)
+            missing += notFoundCount(api.post(path, trackingBody(chunk.map { it.first }, list.wireValue).toString(), scope).body)
         }
         sync.mutate(scope) { snapshot -> apply(snapshot, targets) to Unit }
         return (targets.size - missing).coerceAtLeast(0)
