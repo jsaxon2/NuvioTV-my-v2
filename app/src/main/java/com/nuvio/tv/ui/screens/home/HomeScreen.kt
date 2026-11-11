@@ -20,6 +20,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.DisposableEffect
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -186,6 +187,24 @@ fun HomeScreen(
     val onContinueWatchingPlayManuallyStable = remember(onContinueWatchingPlayManually) { onContinueWatchingPlayManually }
     val onNavigateToCatalogSeeAllStable = remember(onNavigateToCatalogSeeAll) { onNavigateToCatalogSeeAll }
     val onNavigateToFolderDetailStable = remember(onNavigateToFolderDetail) { onNavigateToFolderDetail }
+    // Fork: Continue watching's Drop show, with a note saying which trackers it reached.
+    val dropShowContext = androidx.compose.ui.platform.LocalContext.current
+    val dropShowScope = androidx.compose.runtime.rememberCoroutineScope()
+    val onDropShowStable = remember(viewModel) {
+        { item: ContinueWatchingItem ->
+            dropShowScope.launch {
+                val reached = viewModel.dropShow(item)
+                val message = when {
+                    reached == null -> dropShowContext.getString(com.nuvio.tv.R.string.cw_drop_show_no_trackers)
+                    reached.isEmpty() -> dropShowContext.getString(com.nuvio.tv.R.string.cw_drop_show_failed)
+                    else -> dropShowContext.getString(com.nuvio.tv.R.string.cw_drop_show_done, reached.joinToString(", "))
+                }
+                android.widget.Toast.makeText(dropShowContext, message, android.widget.Toast.LENGTH_LONG).show()
+            }
+            Unit
+        }
+    }
+
     val onRemoveContinueWatchingStable = remember(viewModel) {
         { contentId: String, season: Int?, episode: Int?, isNextUp: Boolean ->
             viewModel.onEvent(HomeEvent.OnRemoveContinueWatching(contentId, season, episode, isNextUp))
@@ -409,7 +428,8 @@ fun HomeScreen(
                             LocalLandscapePosterMode provides
                                 (LocalLandscapePosterMode.current || uiState.modernLandscapePostersEnabled),
                             LocalDimWatchedPosters provides
-                                (uiState.watchedTitlesMode != WatchedTitlesMode.SHOW)
+                                (uiState.watchedTitlesMode != WatchedTitlesMode.SHOW),
+                            com.nuvio.tv.ui.components.LocalCwDropShow provides onDropShowStable
                         ) {
                         when (uiState.homeLayout) {
                             HomeLayout.CLASSIC -> ClassicHomeRoute(
