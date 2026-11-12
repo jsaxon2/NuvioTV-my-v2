@@ -470,11 +470,12 @@ internal fun PlayerRuntimeController.resetPostPlayOverlayState(clearEpisode: Boo
  * Called from [evaluatePostPlayOverlayVisibility] on every progress tick.
  *
  * The trigger is near the end of the episode because StreamPrefetchCache
- * entries expire after five minutes. Firing six minutes out means the first
- * entry expires with about a minute left and the next tick re-fires it
- * ([StreamPrefetchCache.prefetch] no-ops on a fresh or in-flight key), so the
- * second entry is still fresh on the post-play card. Two scrape cycles per
- * episode.
+ * entries expire five minutes after a scrape finishes. Fork: firing four
+ * minutes out (upstream fires at six, which scrapes twice: the first entry
+ * expires with about a minute left and is re-fired) keeps one scrape per
+ * episode that is still fresh on the post-play card. A pause long enough to
+ * outlive the entry re-fires it on the next tick ([StreamPrefetchCache.prefetch]
+ * no-ops on a fresh or in-flight key).
  *
  * Only metadata is listed and ranked; provider resolution and media access
  * wait for selection.
@@ -614,7 +615,7 @@ internal fun PlayerRuntimeController.maybeStartNextEpisodeThumbnails(
 }
 
 /** How much of the episode may remain when the lookahead prefetch fires. */
-private const val BINGE_LOOKAHEAD_TRIGGER_MS = 6L * 60L * 1000L
+private const val BINGE_LOOKAHEAD_TRIGGER_MS = 4L * 60L * 1000L
 
 internal fun PlayerRuntimeController.evaluatePostPlayOverlayVisibility(positionMs: Long, durationMs: Long) {
     if (_playbackTimeline.value.isLive) return
