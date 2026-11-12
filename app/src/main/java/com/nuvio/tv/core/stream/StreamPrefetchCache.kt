@@ -262,7 +262,10 @@ object StreamPrefetchCache {
             existing?.cancel()
             inFlightKey = key
             inFlightBackground = background
-            inFlightJob = scope.async {
+            // Fork: the binge lookahead skips the playback scraper queue (see ScraperPlaybackThrottle).
+            val lookaheadContext = if (source == "binge_lookahead") ScraperPlaybackThrottle.LookaheadExempt()
+                else kotlin.coroutines.EmptyCoroutineContext
+            inFlightJob = scope.async(lookaheadContext) {
                 val (result, capHit) = collectFinal(repository, type, videoId, season, episode, capMs)
                 val rankT0 = SystemClock.elapsedRealtime()
                 val selection = if (rank != null) {
