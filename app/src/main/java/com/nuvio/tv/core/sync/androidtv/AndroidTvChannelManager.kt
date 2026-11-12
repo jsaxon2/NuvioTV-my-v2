@@ -386,13 +386,17 @@ class AndroidTvChannelManager @Inject constructor(
             context.contentResolver.openOutputStream(
                 TvContractCompat.buildChannelLogoUri(channelId)
             )?.use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
-            prefs.setLogoKey(icons.selectedEntry())
+            prefs.setLogoKey(logoKey(icons.selectedEntry()))
         }.onFailure { Log.w(TAG, "writeChannelLogo failed", it) }
     }
 
+    // Fork: the artwork revision is part of the key, so redrawn icons (the Arc+ plus) reach a channel whose
+    // logo was written before, even when the chosen icon itself stays the same.
+    private fun logoKey(entry: Any?): String = "$entry|art$CHANNEL_LOGO_ART_REVISION"
+
     private suspend fun refreshLogoIfIconChanged(channelId: Long) {
         val current = runCatching { appIconManager.get().selectedEntry() }.getOrNull() ?: return
-        if (prefs.getLogoKey() != current) writeChannelLogo(channelId)
+        if (prefs.getLogoKey() != logoKey(current)) writeChannelLogo(channelId)
     }
 
     /**
@@ -416,3 +420,6 @@ class AndroidTvChannelManager @Inject constructor(
         }
     }
 }
+
+/** Fork: bump when the launcher artwork changes, so the channel logo is redrawn. */
+private const val CHANNEL_LOGO_ART_REVISION = 2
