@@ -616,7 +616,12 @@ class StreamRepositoryImpl @Inject constructor(
                                 resultChannel = resultChannel
                             )
                         }
-                        if (continuePluginOnly) {
+                        // Fork: the next episode's lookahead runs its scrapers while the video plays;
+                        // held behind the pause, they only ran once the next-episode card opened.
+                        val bingeLookahead = kotlinx.coroutines.currentCoroutineContext()[
+                            com.nuvio.tv.core.stream.ScraperPlaybackThrottle.LookaheadExempt
+                        ] != null
+                        if (continuePluginOnly || bingeLookahead) {
                             // Playback pause and closing the episode list suspend ordinary
                             // plugin work. The next-episode scraper has to keep running.
                             runPlugins()
