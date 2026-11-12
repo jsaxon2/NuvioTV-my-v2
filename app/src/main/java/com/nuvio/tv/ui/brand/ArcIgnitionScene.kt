@@ -451,10 +451,11 @@ class ArcIgnitionScene private constructor(
         private const val LogoSize = 520f
         private const val SourceX = LogoX + 787f / 1254f * LogoSize
         private const val SourceY = LogoY + 186f / 1254f * LogoSize
-        private const val LetterLeft = 616f
+        // Fork: the Arc+ lettering is wider; kept centred on the stage (960).
+        private const val LetterLeft = 576f
         private const val LightMargin = 160f
         private const val LetterTop = 720f
-        private const val LetterWidth = 686f
+        private const val LetterWidth = 769f
         private const val SampleCount = 481
         private val Backdrop = Color.rgb(3, 5, 10)
 

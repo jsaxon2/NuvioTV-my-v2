@@ -26,7 +26,8 @@ import kotlin.math.roundToInt
 /** The horizontal lockup, decoded at the size a slot needs and coloured for the active palette. */
 object ArcBrandArt {
     @DrawableRes val LockupResource = R.drawable.app_logo_wordmark
-    const val LockupWidth = 1209
+    // Fork: wider for the Arc+ plus after the lettering.
+    const val LockupWidth = 1309
     const val LockupHeight = 314
     /** The symbol on its own is the left part of the lockup. */
     const val MarkWidth = 318
