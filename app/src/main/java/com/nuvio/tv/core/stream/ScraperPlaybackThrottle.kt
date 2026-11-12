@@ -1,5 +1,6 @@
 package com.nuvio.tv.core.stream
 
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
@@ -14,6 +15,9 @@ import kotlinx.coroutines.sync.withLock
  * while the user watches; on a weak box that starves the player UI. While [playbackActive] is
  * set, a scraper only starts when fewer than [PLAYBACK_LIMIT] are running; the rest wait their
  * turn. Clearing it (sources panel opened, player closed) lets every waiting scraper go at once.
+ *
+ * A search carrying [LookaheadExempt] skips the queue: the next episode's lookahead has a few minutes
+ * to finish before the episode does, and it is what the next-episode card plays from.
  */
 object ScraperPlaybackThrottle {
     private const val PLAYBACK_LIMIT = 2
@@ -26,7 +30,13 @@ object ScraperPlaybackThrottle {
         playing.value = active
     }
 
+    /** Marks a search that skips the playback queue (the next episode's binge lookahead). */
+    class LookaheadExempt : kotlin.coroutines.AbstractCoroutineContextElement(Key) {
+        companion object Key : kotlin.coroutines.CoroutineContext.Key<LookaheadExempt>
+    }
+
     suspend fun <T> run(block: suspend () -> T): T {
+        if (currentCoroutineContext()[LookaheadExempt] != null) return block()
         while (true) {
             val admitted = admission.withLock {
                 if (!playing.value || running.value < PLAYBACK_LIMIT) {
