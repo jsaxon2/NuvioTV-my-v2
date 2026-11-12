@@ -13,13 +13,13 @@
 .EXAMPLE
   .\scripts\install-tvs.ps1 -SkipBuild
 .EXAMPLE
-  .\scripts\install-tvs.ps1 -Devices 192.168.1.68:5555
+  .\scripts\install-tvs.ps1 -Devices 192.168.1.200:5555
 .EXAMPLE
-  .\scripts\install-tvs.ps1 -Devices "192.168.1.68:5555,192.168.1.194:5555"
+  .\scripts\install-tvs.ps1 -Devices "192.168.1.200:5555,192.168.1.194:5555"
 #>
 param(
-    # Box R 4K Plus (living room), Shield (bedroom), Ally's Shield (tube)
-    [string[]]$Devices = @("192.168.1.70:5555", "192.168.1.68:5555", "192.168.1.194:5555"),
+    # Box R 4K Plus (living room), Shield 2017 (bedroom), Ally's Shield (tube)
+    [string[]]$Devices = @("192.168.1.70:5555", "192.168.1.200:5555", "192.168.1.194:5555"),
     [string]$Package = "com.nuvio.tv.test.jack",
     [switch]$SkipBuild
 )
