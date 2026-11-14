@@ -54,6 +54,8 @@ class UpdateJobService : JobService() {
     private var jobScope: CoroutineScope? = null
 
     override fun onStartJob(params: JobParameters): Boolean {
+        // Fork: Arc+ never checks for updates; a job left from an earlier build just ends.
+        if (!com.nuvio.tv.BuildConfig.UPDATE_CHECK_ENABLED) return false
         val entryPoint = EntryPointAccessors.fromApplication(applicationContext, UpdateJobEntryPoint::class.java)
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         jobScope = scope
