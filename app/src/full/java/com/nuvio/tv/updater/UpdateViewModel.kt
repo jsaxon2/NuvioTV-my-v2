@@ -379,6 +379,12 @@ class UpdateViewModel @Inject constructor(
     // Background checks run while the banner or automatic installs are on; the idle install job only with the latter.
     private fun syncBackgroundJobs() {
         if (BuildConfig.IS_DEBUG_BUILD) return
+        if (!BuildConfig.UPDATE_CHECK_ENABLED) {
+            // Fork: no update checks in Arc+, so no background checks or installs either.
+            UpdateJobService.cancelPeriodicCheck(context)
+            UpdateJobService.cancelIdleInstall(context)
+            return
+        }
         val state = _uiState.value
         if (state.updateBannerEnabled || state.autoInstallEnabled) {
             UpdateJobService.schedulePeriodicCheck(context)
