@@ -193,12 +193,12 @@ android {
         buildConfigField("String", "PREMIUMIZE_CLIENT_ID", "\"${localProperties.getProperty("PREMIUMIZE_CLIENT_ID", "")}\"")
         buildConfigField("String", "SPONSOR_NAMES", buildConfigString(sponsorNames))
 
-        // One beta stream for this fork, including GitHub prereleases.
-        buildConfigField("String", "GITHUB_OWNER", "\"ysosrs123\"")
-        buildConfigField("String", "GITHUB_REPO", "\"NuvioTV-Fork\"")
-        buildConfigField("String", "GITHUB_REPO_NEW_NAME", "\"Nuvio-Arc\"")
-        // Fork: Arc+ has no release feed of its own, so it never checks ysosrs123's releases.
-        buildConfigField("boolean", "UPDATE_CHECK_ENABLED", "false")
+        // Fork: Arc+ checks its own releases (jsaxon2/NuvioTV-my-v2), never ysosrs123's. Each release body
+        // carries <!-- nuvio-fork-version-code: N --> with N = Arc's code * 10 + the Arc+ release number.
+        buildConfigField("String", "GITHUB_OWNER", "\"jsaxon2\"")
+        buildConfigField("String", "GITHUB_REPO", "\"NuvioTV-my-v2\"")
+        buildConfigField("String", "GITHUB_REPO_NEW_NAME", "\"NuvioTV-my-v2\"")
+        buildConfigField("boolean", "UPDATE_CHECK_ENABLED", "true")
     }
 
     flavorDimensions += "distribution"
