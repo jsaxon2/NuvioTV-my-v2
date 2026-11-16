@@ -90,4 +90,6 @@ button style.
 - App name **Nuvio Arc+**, a **+** on the launcher icons, TV banners, in-app wordmark and intro lettering.
 - App id `com.nuvio.tv.test.jack` (so it installs next to Arc).
 - `scripts/install-tvs.ps1`: builds, installs on the TVs over adb and compiles the app fully.
-- **No update checks and no issue reports**: Arc+ doesn't look at Arc's releases (the About screen's update rows are hidden), and the report endpoint is left blank, so report buttons and prompts stay off.
+- **Its own updates, no issue reports**: Arc+ checks this repository's releases, never Arc's (each release
+  body carries `<!-- nuvio-fork-version-code: N -->`, N = Arc's code × 10 + the Arc+ release number). The
+  report endpoint is left blank, so report buttons and prompts stay off.

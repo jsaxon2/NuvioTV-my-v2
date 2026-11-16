@@ -79,12 +79,23 @@ Matching **AAC, MP3, Mono, Stereo, PCM and Passthrough** badges for the Elite-Ba
 
 ## Getting it
 
-Arc+ has no downloads or releases. It's built from this repository for my own TVs, and it installs
-next to Arc under its own app id. It doesn't check for updates and has no issue reporting.
+Arc+ installs next to the official Nuvio and Nuvio Arc under its own app id, and tells you when a new
+Arc+ release is out (Settings > About).
 
-If you want these features, use **[Nuvio Arc](https://github.com/ysosrs123/NuvioTV-Fork)**. Some of
-them may find their way there. To build Arc+ yourself, follow Arc's build setup on the `try-perf`
-branch, which holds everything.
+| Your box | Direct download |
+|---|---|
+| **32-bit:** Fire TV Stick, Chromecast with Google TV, Box R, Shield tube and many other Google TV boxes | [32-bit APK](https://github.com/jsaxon2/NuvioTV-my-v2/releases/latest/download/app-full-armeabi-v7a-release.apk) |
+| **64-bit:** Nvidia Shield 2017 and Pro, Ugoos | [64-bit APK](https://github.com/jsaxon2/NuvioTV-my-v2/releases/latest/download/app-full-arm64-v8a-release.apk) |
+
+1. Install **Downloader** by AFTVnews from your box's app store, and allow it to install unknown apps.
+2. In Downloader, enter the download link for your box and press Go.
+3. Press Install when the download finishes.
+
+Not sure which one? Many boxes run a 32-bit system even with a 64-bit chip. Try 64-bit first. If it says
+the app isn't compatible, use 32-bit. All releases are on the [Releases page](https://github.com/jsaxon2/NuvioTV-my-v2/releases).
+
+Arc+ is a personal project: it follows Arc a little behind each release, and has no support or issue
+reporting. The code lives on three branches:
 
 | Branch | What it holds |
 |---|---|
