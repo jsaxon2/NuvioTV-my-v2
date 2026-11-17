@@ -24,6 +24,9 @@ tube. Unit tests are included where the logic is testable; the commit messages e
   It follows the Watch Progress source: Nuvio Sync, Trakt (`sync/history`), Simkl, MDBList or WeTrakr.
   Cards get poster, backdrop and logo (so the hero shows), saved between launches.
 - **Upcoming row opens the details page** instead of starting playback.
+- **Episodes left counts an episode from the day after it airs** when the add-on gives only a date (a plain
+  date, or a stamp at midnight UTC or local midnight). Read as a time, it counted tonight's episode from the
+  evening before. A real air time still counts from that moment.
 - **Drop show** in the Continue Watching long-press menu (shows only): marks the show Dropped on every
   connected tracker — Simkl (moves to Dropped), WeTrakr (Dropped list), Trakt (`POST users/hidden/dropped`)
   and MDBList (`POST /sync/dropped`) — then clears the card as Remove does. History, ratings and the Nuvio

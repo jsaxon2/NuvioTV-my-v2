@@ -12,9 +12,31 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.time.Clock
+import java.time.LocalDate
+import java.time.LocalTime
+import java.time.ZoneOffset
 
 internal fun Collection<Pair<Int, Int>>.episodesLeftFrom(season: Int, episode: Int): Int? =
     count { (s, e) -> s > season || (s == season && e >= episode) }.takeIf { it > 0 }
+
+/**
+ * Fork: whether an episode counts toward "episodes left". A release with a real time counts from that moment. A
+ * date with no time counts from the day after: a plain date, or a stamp at midnight UTC or at midnight where the
+ * viewer is, as add-ons send a date they have no air time for. Read as a time, it would count hours before the
+ * episode airs (from the evening before in the Americas, or all day for a midnight-local stamp).
+ */
+internal fun countsAsAiredForEpisodesLeft(raw: String?, clock: Clock = Clock.systemDefaultZone()): Boolean? {
+    val value = raw?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+    val instant = parseEpisodeReleaseInstant(value, clock.zone) ?: return null
+    val utc = instant.atOffset(ZoneOffset.UTC)
+    if (value.length == 10 || utc.toLocalTime() == LocalTime.MIDNIGHT) {
+        return utc.toLocalDate().isBefore(LocalDate.now(clock))
+    }
+    val local = instant.atZone(clock.zone)
+    if (local.toLocalTime() == LocalTime.MIDNIGHT) return local.toLocalDate().isBefore(LocalDate.now(clock))
+    return !instant.isAfter(clock.instant())
+}
 
 /** An episode with no date after the last dated one isn't out yet. A show with no dates at all counts in full. */
 private fun <V> List<V>.releasedEpisodeKeys(
@@ -25,6 +47,7 @@ private fun <V> List<V>.releasedEpisodeKeys(
     val keyed = mapNotNull { video ->
         val s = season(video) ?: return@mapNotNull null
         val e = episode(video) ?: return@mapNotNull null
+        if (countsAsAiredForEpisodesLeft(released(video)) == false) return@mapNotNull null
         (s to e) to released(video)
     }
     val lastDated = keyed.filter { (_, date) -> parseEpisodeReleaseInstant(date) != null }

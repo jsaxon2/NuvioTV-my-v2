@@ -4,7 +4,12 @@ import com.nuvio.tv.domain.model.WatchProgress
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.time.Clock
+import java.time.Instant
+import java.time.ZoneId
 
 class CwEpisodesLeftTest {
 
@@ -41,6 +46,21 @@ class CwEpisodesLeftTest {
         assertEquals(3, gap.episodesLeftFrom(1, 1))
         val noDates = summary(episode(1, 1, null), episode(1, 2, null))
         assertEquals(2, noDates.episodesLeftFrom(1, 1))
+    }
+
+    @Test
+    fun `a date with no time counts from the next day, a real air time from that moment`() {
+        // 4:07 PM Eastern on 16 November.
+        val now = Clock.fixed(Instant.parse("2026-11-16T21:07:00Z"), ZoneId.of("America/New_York"))
+        assertFalse(countsAsAiredForEpisodesLeft("2026-11-16", now)!!)
+        assertFalse(countsAsAiredForEpisodesLeft("2026-11-16T00:00:00.000Z", now)!!)
+        assertTrue(countsAsAiredForEpisodesLeft("2026-11-15T00:00:00.000Z", now)!!)
+        assertFalse(countsAsAiredForEpisodesLeft("2026-11-17T04:00:00.000Z", now)!!)
+        assertTrue(countsAsAiredForEpisodesLeft("2026-11-16T20:00:00.000Z", now)!!)
+        // Midnight Eastern on the air date: a date, not an air time.
+        assertFalse(countsAsAiredForEpisodesLeft("2026-11-16T05:00:00.000Z", now)!!)
+        assertTrue(countsAsAiredForEpisodesLeft("2026-11-15T05:00:00.000Z", now)!!)
+        assertNull(countsAsAiredForEpisodesLeft(null, now))
     }
 
     @Test
