@@ -36,6 +36,11 @@ class ForkUpdateRepositoryTest {
         assertEquals("Notes", update.notes)
         coVerify(exactly = 0) { api.getLatestRelease(any(), any()) }
     }
+    @Test fun `notes written on GitHub's website get plain line ends for the Markdown renderer`() = runTest {
+        val web = release().copy(body = "## New\r\n\r\n- **One**\r\n- Two\r\n\r\n<!-- nuvio-fork-version-code: $nextCode -->")
+        coEvery { api.getReleases(any(), any(), any(), any()) } returns Response.success(listOf(web))
+        assertEquals("## New\n\n- **One**\n- Two", repo.getLatestUpdate(listOf("arm64-v8a")).getOrThrow().notes)
+    }
     @Test fun `skips newer release without compatible ABI and never accepts external asset URL`() = runTest {
         coEvery { api.getReleases(any(), any(), any(), any()) } returns Response.success(listOf(
             release(nextCode + 2, listOf(asset("x86_64"))),

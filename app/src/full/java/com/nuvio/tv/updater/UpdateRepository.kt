@@ -42,7 +42,10 @@ class UpdateRepository @Inject constructor(private val gitHubReleaseApi: GitHubR
         val (dto, asset) = selected
         Result.success(AppUpdate(
             tag = dto.tagName!!, title = dto.name?.takeIf { it.isNotBlank() } ?: dto.tagName,
-            notes = dto.body.orEmpty().replace(Regex("""<!-- nuvio-fork-version-code: [0-9]+ -->"""), "").trim(),
+            // Fork: releases written on GitHub's website use CRLF line ends, which the Markdown renderer doesn't
+            // read as line breaks; the notes then showed as one paragraph without headings or lists.
+            notes = dto.body.orEmpty().replace("\r\n", "\n").replace('\r', '\n')
+                .replace(Regex("""<!-- nuvio-fork-version-code: [0-9]+ -->"""), "").trim(),
             releaseUrl = dto.htmlUrl, assetName = asset.name, assetUrl = asset.browserDownloadUrl,
             assetSizeBytes = asset.size, versionCode = ReleaseSelector.versionCode(dto)
         ))
