@@ -37,6 +37,8 @@ tube. Unit tests are included where the logic is testable; the commit messages e
 - **TMDB reviews** as an alternative to Trakt reviews (setting), with the TMDB logo in the review popup.
 - **Resume button shows progress**: a thin bar inside the button in the theme colour; the track goes dark
   while the V2 button is focused so it stays readable.
+- **Episode card progress bar** matches the Continue Watching card and sits clear of the focus border, so it
+  stays visible on the focused episode.
 - **Reset progress** in the long-press menus of the Resume button and of an episode: removes the saved
   position without marking anything watched or unwatched. The player's episode panel shares the menu but
   doesn't opt in.
@@ -80,7 +82,8 @@ tube. Unit tests are included where the logic is testable; the commit messages e
   rest wait. Opening the sources panel or leaving the player lets them all go.
 - **One next-episode lookahead, 4 minutes out**: the binge lookahead fired at 6 minutes, so its 5-minute
   cache entry expired near the end and it scraped twice. At 4 minutes it scrapes once and is still fresh on
-  the next-episode card. It also skips the playback scraper queue above.
+  the next-episode card. It also skips the playback scraper queue above, and the pause that holds scrapers back
+  during playback, so its sources are ready before the next-episode card.
 
 ## Fixed here first, since taken over by Arc
 
