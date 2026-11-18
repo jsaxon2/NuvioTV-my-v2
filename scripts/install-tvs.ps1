@@ -19,7 +19,7 @@
 #>
 param(
     # Box R 4K Plus (living room), Shield 2017 (bedroom), Ally's Shield (tube)
-    [string[]]$Devices = @("192.168.1.70:5555", "192.168.1.200:5555", "192.168.1.194:5555"),
+    [string[]]$Devices = @("192.168.1.65:5555", "192.168.1.200:5555", "192.168.1.194:5555"),
     [string]$Package = "com.nuvio.tv.test.jack",
     [switch]$SkipBuild
 )
