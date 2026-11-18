@@ -923,9 +923,13 @@ private fun EpisodeCard(
                     if (isUnavailable) Text(strUnavailable, style = typography.labelSmall, color = Color.White,
                         modifier = Modifier.align(if (showCompletedBadge) Alignment.TopStart else Alignment.TopEnd)
                             .background(Color(0xCC5D4037)).padding(6.dp))
-                    if (showProgress) Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().height(3.dp)
-                        .background(Color.Black.copy(alpha = .6f))) {
-                        Box(Modifier.fillMaxWidth(progressPercent.coerceIn(0f, 1f)).height(3.dp).background(progressFillColor))
+                    // Fork: the Continue watching card's bar, inset off the edge so the focus border doesn't cover it.
+                    if (showProgress) Box(Modifier.align(Alignment.BottomStart)
+                        .padding(horizontal = 10.dp, vertical = NuvioTheme.spacing.xs)
+                        .fillMaxWidth().clip(RoundedCornerShape(1.5.dp)).height(3.dp)
+                        .background(Color.Black.copy(alpha = 0.3f))) {
+                        Box(Modifier.fillMaxWidth(progressPercent.coerceIn(0f, 1f))
+                            .clip(RoundedCornerShape(1.5.dp)).height(3.dp).background(progressFillColor))
                     }
                 }
             }
