@@ -102,7 +102,8 @@ class UpdateJobService : JobService() {
                 update.tag, BuildConfig.VERSION_NAME, update.versionCode, BuildConfig.VERSION_CODE.toLong()
             )
         ) return
-        if (update.dismissalKey == preferences.ignoredTag.first()) return
+        // Fork: with automatic installs on, closing the banner only hides it; the update still installs.
+        if (!autoInstallEnabled && update.dismissalKey == preferences.ignoredTag.first()) return
 
         if (PlayerSessionTracker.isOpenNow) throw PlayerOpenException()
         val file = downloadStore.download(update) { _, _ ->
@@ -123,7 +124,7 @@ class UpdateJobService : JobService() {
         if (!canInstallSilently(applicationContext) || !preferences.autoInstallEnabled.first()) return
         val downloadStore = entryPoint.updateDownloadStore()
         val (tag, apkFile, code) = downloadStore.pendingInstall() ?: return
-        if (tag == preferences.ignoredTag.first()?.substringBefore('#')) return
+        // Fork: no skipped-release check here: automatic installs are on, and closing the banner only hides it.
         val valid = runCatching { ApkInstaller.validateUpdate(applicationContext, apkFile, null, null) }
         if (valid.isFailure) {
             Log.w(TAG, "Dropping downloaded update $tag", valid.exceptionOrNull())

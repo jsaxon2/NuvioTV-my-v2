@@ -114,7 +114,13 @@ class UpdateViewModel @Inject constructor(
                 )
             }
 
-            val dismissedTag = updatePreferences.ignoredTag.first()
+            // Fork: a check the user asks for clears a release skipped with the banner's close button.
+            val dismissedTag = if (force) {
+                try { updatePreferences.setIgnoredTag(null) } catch (_: java.io.IOException) { }
+                null
+            } else {
+                updatePreferences.ignoredTag.first()
+            }
             val result = updateRepository.getLatestUpdate()
             try { updatePreferences.setLastCheckAtMs(System.currentTimeMillis()) } catch (_: java.io.IOException) { /* Check result remains usable. */ }
 
@@ -126,7 +132,9 @@ class UpdateViewModel @Inject constructor(
                     val installedUpdate = _uiState.value.installedUpdate?.let { installed ->
                         if (installed.tag == update.tag) update else installed
                     }
-                    if (remoteNewer && downloadedFile == null && update.dismissalKey != dismissedTag && !BuildConfig.IS_DEBUG_BUILD) {
+                    if (remoteNewer && downloadedFile == null &&
+                        (update.dismissalKey != dismissedTag || _uiState.value.autoInstallEnabled) && !BuildConfig.IS_DEBUG_BUILD
+                    ) {
                         UpdateJobService.scheduleCheckNow(context)
                     }
                     val shouldShow = UpdateBannerPolicy.shouldShow(
