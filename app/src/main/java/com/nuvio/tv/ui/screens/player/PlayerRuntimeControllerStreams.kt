@@ -25,6 +25,7 @@ import com.nuvio.tv.domain.model.enabledAddons
 import com.nuvio.tv.ui.components.SourceChipItem
 import com.nuvio.tv.ui.components.SourceChipStatus
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.async
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
@@ -2670,11 +2671,40 @@ internal fun PlayerRuntimeController.playNextEpisode(userInitiated: Boolean = fa
                     "selected=${selectedStream != null} timeoutElapsed=$timeoutElapsed " +
                     "selectMs=$selectionRankMs selectCalls=$selectionRankCalls"
             )
-            val streamToPlay = selectedStream?.let {
-                resolveDirectDebridStreamIfNeeded(it, nextVideo.season, nextVideo.episode)
+            // Fork: the debrid link (TorBox and the like, 1-2 s) resolves while the auto-play countdown runs,
+            // instead of before it under "Finding sources".
+            val picked = selectedStream
+            val resolving = picked?.let { stream ->
+                async {
+                    // A failed resolve falls back to the episode's source list, as before.
+                    try {
+                        resolveDirectDebridStreamIfNeeded(stream, nextVideo.season, nextVideo.episode)
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        null
+                    }
+                }
             }
+            if (picked != null && !userInitiated) {
+                val sourceName = (picked.name?.takeIf { it.isNotBlank() } ?: picked.addonName).trim()
+                for (remaining in 3 downTo 1) {
+                    _uiState.update { current ->
+                        val episodeForMode = current.nextEpisode ?: nextInfo
+                        current.copy(
+                            postPlayMode = PostPlayMode.AutoPlay(
+                                nextEpisode = episodeForMode,
+                                searching = false,
+                                sourceName = sourceName,
+                                countdownSec = remaining,
+                            ),
+                        )
+                    }
+                    delay(1000)
+                }
+            }
+            val streamToPlay = resolving?.await()
             if (streamToPlay != null) {
-                val sourceName = (streamToPlay.name?.takeIf { it.isNotBlank() } ?: streamToPlay.addonName).trim()
                 // The countdown exists so the decision can be cancelled.
                 //
                 // A deliberate press skips it: the user already chose, and
@@ -2689,22 +2719,7 @@ internal fun PlayerRuntimeController.playNextEpisode(userInitiated: Boolean = fa
                 // covers the whole resolve above, and with no countdown
                 // the resolve runs straight into switchToEpisodeStream, so the
                 // unguarded window is ~0 ms.
-                if (!userInitiated) {
-                    for (remaining in 3 downTo 1) {
-                        _uiState.update { current ->
-                            val episodeForMode = current.nextEpisode ?: nextInfo
-                            current.copy(
-                                postPlayMode = PostPlayMode.AutoPlay(
-                                    nextEpisode = episodeForMode,
-                                    searching = false,
-                                    sourceName = sourceName,
-                                    countdownSec = remaining,
-                                ),
-                            )
-                        }
-                        delay(1000)
-                    }
-                }
+                // (Fork: the countdown now runs above, while the link resolves.)
                 _uiState.update {
                     it.copy(
                         postPlayMode = null,
