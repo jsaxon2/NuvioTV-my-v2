@@ -84,6 +84,8 @@ tube. Unit tests are included where the logic is testable; the commit messages e
   cache entry expired near the end and it scraped twice. At 4 minutes it scrapes once and is still fresh on
   the next-episode card. It also skips the playback scraper queue above, and the pause that holds scrapers back
   during playback, so its sources are ready before the next-episode card.
+- **Next-episode countdown starts at once**: the debrid link (TorBox, 1-2 s) is fetched during the 3 second
+  countdown instead of before it, so the card skips "Finding sources" and the episode starts sooner.
 
 ## Fixed here first, since taken over by Arc
 
