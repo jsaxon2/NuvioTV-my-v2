@@ -1458,7 +1458,7 @@ private fun StreamCard(
     val unknownStreamLabel = stringResource(R.string.stream_unknown)
     val streamName = remember(stream, unknownStreamLabel) { stream.getDisplayNameOrNull() ?: unknownStreamLabel }
     val streamDescription = remember(stream) { stream.getDisplayDescription() }
-    val hasBadges = stream.badges.isNotEmpty() || (showFileSizeBadges && stream.behaviorHints?.videoSize != null) || reserveBadgeSpace
+    val hasBadges = stream.badges.isNotEmpty() || (showFileSizeBadges && com.nuvio.tv.core.debrid.StreamTextSizeParser.effectiveSizeBytes(stream) != null) || reserveBadgeSpace
     val cardShape = RoundedCornerShape(NuvioTheme.radii.md)
     val hasGradientFocusRing = NuvioTheme.palette.focusRingGradient.size > 1
 
@@ -1532,10 +1532,10 @@ private fun StreamCard(
                     )
                 }
                 if (hasBadges && badgePlacement == StreamBadgePlacement.TOP) {
-                    if (stream.badges.isNotEmpty() || (showFileSizeBadges && stream.behaviorHints?.videoSize != null)) {
+                    if (stream.badges.isNotEmpty() || (showFileSizeBadges && com.nuvio.tv.core.debrid.StreamTextSizeParser.effectiveSizeBytes(stream) != null)) {
                         StreamBadgeChips(
                             badges = stream.badges,
-                            fileSizeBytes = stream.behaviorHints?.videoSize,
+                            fileSizeBytes = com.nuvio.tv.core.debrid.StreamTextSizeParser.effectiveSizeBytes(stream),
                             showFileSizeBadge = showFileSizeBadges,
                             animate = shouldAnimateBadges,
                             focused = isFocused
@@ -1612,10 +1612,10 @@ private fun StreamCard(
                 }
 
                 if (hasBadges && badgePlacement == StreamBadgePlacement.BOTTOM) {
-                    if (stream.badges.isNotEmpty() || (showFileSizeBadges && stream.behaviorHints?.videoSize != null)) {
+                    if (stream.badges.isNotEmpty() || (showFileSizeBadges && com.nuvio.tv.core.debrid.StreamTextSizeParser.effectiveSizeBytes(stream) != null)) {
                         StreamBadgeChips(
                             badges = stream.badges,
-                            fileSizeBytes = stream.behaviorHints?.videoSize,
+                            fileSizeBytes = com.nuvio.tv.core.debrid.StreamTextSizeParser.effectiveSizeBytes(stream),
                             showFileSizeBadge = showFileSizeBadges,
                             animate = shouldAnimateBadges,
                             focused = isFocused,
