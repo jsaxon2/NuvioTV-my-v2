@@ -1524,7 +1524,7 @@ class PlayerSettingsDataStore @Inject constructor(
                     min = 97f,
                     max = 100f
                 ),
-                nextEpisodeThresholdMinutesBeforeEnd = normalizeHalfStep(
+                nextEpisodeThresholdMinutesBeforeEnd = normalizeFiveSecondStep(
                     value = prefs.typed(nextEpisodeThresholdMinutesBeforeEndKey)
                         ?: prefs.typed(nextEpisodeThresholdMinutesBeforeEndLegacyKey)?.toFloat()
                         ?: 2f,
@@ -2305,7 +2305,7 @@ class PlayerSettingsDataStore @Inject constructor(
 
     suspend fun setNextEpisodeThresholdMinutesBeforeEnd(minutes: Float) {
         store().edit { prefs ->
-            prefs[nextEpisodeThresholdMinutesBeforeEndKey] = normalizeHalfStep(
+            prefs[nextEpisodeThresholdMinutesBeforeEndKey] = normalizeFiveSecondStep(
                 value = minutes,
                 min = 0f,
                 max = 3.5f
@@ -2315,6 +2315,11 @@ class PlayerSettingsDataStore @Inject constructor(
 
     private fun normalizeHalfStep(value: Float, min: Float, max: Float): Float {
         return (value.coerceIn(min, max) * 2f).roundToInt() / 2f
+    }
+
+    /** Fork: minutes in 5 second steps (twelfths of a minute), for the next-episode card's time before the end. */
+    private fun normalizeFiveSecondStep(value: Float, min: Float, max: Float): Float {
+        return (value.coerceIn(min, max) * 12f).roundToInt() / 12f
     }
 
     suspend fun setStreamReuseLastLinkEnabled(enabled: Boolean) {

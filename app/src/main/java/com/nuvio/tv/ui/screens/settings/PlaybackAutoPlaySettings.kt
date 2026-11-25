@@ -294,12 +294,13 @@ internal fun PlaybackUpNextSection(
         NextEpisodeThresholdMode.MINUTES_BEFORE_END -> SliderSettingsItem(
             title = stringResource(R.string.autoplay_threshold_min_title),
             subtitle = stringResource(R.string.autoplay_threshold_pct_sub),
-            value = (settings.nextEpisodeThresholdMinutesBeforeEnd * 2f).roundToInt(),
-            valueText = "${formatHalfStepValue(settings.nextEpisodeThresholdMinutesBeforeEnd)} min",
+            // Fork: 5 second steps (0 to 3.5 min), shown as "45 sec" or "1:30 min".
+            value = (settings.nextEpisodeThresholdMinutesBeforeEnd * 12f).roundToInt(),
+            valueText = formatFiveSecondSteps((settings.nextEpisodeThresholdMinutesBeforeEnd * 12f).roundToInt()),
             minValue = 0,
-            maxValue = 7,
+            maxValue = 42,
             step = 1,
-            onValueChange = { value -> onUpdate { setNextEpisodeThresholdMinutesBeforeEnd(value / 2f) } }
+            onValueChange = { value -> onUpdate { setNextEpisodeThresholdMinutesBeforeEnd(value / 12f) } }
         )
     }
 
@@ -369,6 +370,11 @@ internal fun PlaybackUpNextSection(
 @Composable
 private fun selectionSummary(selectedCount: Int, allLabel: String): String =
     if (selectedCount == 0) allLabel else stringResource(R.string.autoplay_selected_count, selectedCount)
+
+private fun formatFiveSecondSteps(steps: Int): String {
+    val seconds = steps * 5
+    return if (seconds < 60) "$seconds sec" else String.format(Locale.US, "%d:%02d min", seconds / 60, seconds % 60)
+}
 
 private fun formatHalfStepValue(value: Float): String {
     return if (value % 1f == 0f) {
