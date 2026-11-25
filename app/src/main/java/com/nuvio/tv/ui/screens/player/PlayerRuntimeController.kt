@@ -595,6 +595,8 @@ class PlayerRuntimeController(
     /** Cancels previous TEXT-track bounce jobs when subtitle delay is adjusted repeatedly. */
     internal var subtitleTimingRefreshJob: Job? = null
     internal var nextEpisodeAutoPlayJob: Job? = null
+    /** Fork: completed by the next-episode card's Play now, so the wait for the episode's end stops. */
+    internal var nextEpisodePlayNow: kotlinx.coroutines.CompletableDeferred<Unit>? = null
     internal var mixCardPositionMs: Long = 0L
     internal var debridResolveJob: Job? = null
     internal var serverReplacePrepareRunning = false

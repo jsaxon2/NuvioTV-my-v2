@@ -2292,6 +2292,8 @@ internal fun PlayerRuntimeController.playNextEpisode(userInitiated: Boolean = fa
     if (activeAutoPlay != null &&
         (activeAutoPlay.searching || activeAutoPlay.countdownSec != null)
     ) {
+        // Fork: Play now on the card while it counts down to the episode's end plays straight away.
+        if (userInitiated) nextEpisodePlayNow?.complete(Unit)
         return
     }
 
@@ -2320,6 +2322,10 @@ internal fun PlayerRuntimeController.playNextEpisode(userInitiated: Boolean = fa
     }
 
     nextEpisodeAutoPlayJob?.cancel()
+    val playNow = CompletableDeferred<Unit>().also {
+        if (userInitiated) it.complete(Unit)
+        nextEpisodePlayNow = it
+    }
     nextEpisodeAutoPlayJob = scope.launch {
         try {
             streamRepository.setLocalPluginSearchPaused(false)
@@ -2688,7 +2694,9 @@ internal fun PlayerRuntimeController.playNextEpisode(userInitiated: Boolean = fa
             }
             if (picked != null && !userInitiated) {
                 val sourceName = (picked.name?.takeIf { it.isNotBlank() } ?: picked.addonName).trim()
-                for (remaining in 3 downTo 1) {
+                // Fork: the card counts down to the end of the episode and plays the next one there;
+                // Play now cuts it short. Seeking back out of the last stretch takes the card away.
+                val keep = countDownToEpisodeEnd(playNow) { remaining ->
                     _uiState.update { current ->
                         val episodeForMode = current.nextEpisode ?: nextInfo
                         current.copy(
@@ -2700,7 +2708,11 @@ internal fun PlayerRuntimeController.playNextEpisode(userInitiated: Boolean = fa
                             ),
                         )
                     }
-                    delay(1000)
+                }
+                if (!keep) {
+                    resolving?.cancel()
+                    _uiState.update { it.copy(postPlayMode = null) }
+                    return@launch
                 }
             }
             val streamToPlay = resolving?.await()
@@ -2839,4 +2851,39 @@ private fun List<AddonStreams>.withoutAddonsWhenContinuingPlugin(bingeGroup: Str
         }
         if (streams.isEmpty()) null else group.copy(streams = streams)
     }
+}
+
+/**
+ * Fork: waits for the end of the playing episode, calling [onSecond] with the seconds left (it stays put while
+ * paused). Ends early on [playNow]. Very near the end it counts three seconds so there is still time to cancel.
+ * False when the viewer seeks back well before the card's stretch, so the card should go away.
+ */
+private suspend fun PlayerRuntimeController.countDownToEpisodeEnd(
+    playNow: CompletableDeferred<Unit>,
+    onSecond: (Int) -> Unit
+): Boolean {
+    fun remainingSec(): Int {
+        if (_uiState.value.playbackEnded) return 0
+        val timeline = playbackTimeline.value
+        val duration = timeline.duration.takeIf { it > 0L } ?: lastKnownDuration
+        if (duration <= 0L) return 0
+        return ((duration - timeline.currentPosition + 999L) / 1000L).toInt().coerceAtLeast(0)
+    }
+    val start = remainingSec()
+    if (start < 3) {
+        for (left in 3 downTo 1) {
+            if (playNow.isCompleted) return true
+            onSecond(left)
+            withTimeoutOrNull(1000L) { playNow.await() }
+        }
+        return true
+    }
+    while (!playNow.isCompleted) {
+        val left = remainingSec()
+        if (left <= 0) return true
+        if (left > start + 15) return false
+        onSecond(left)
+        withTimeoutOrNull(250L) { playNow.await() }
+    }
+    return true
 }

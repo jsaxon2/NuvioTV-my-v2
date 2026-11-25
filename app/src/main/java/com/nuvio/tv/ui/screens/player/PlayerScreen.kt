@@ -1497,8 +1497,9 @@ fun PlayerScreen(
                         }
                         KeyEvent.KEYCODE_DPAD_LEFT,
                         KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                            val overlayButtonsCoexist = skipButtonActuallyVisible &&
-                                uiState.postPlayMode is PostPlayMode.AutoPlay
+                            // Fork: the up-next card has Cancel and Play now side by side, so left/right
+                            // move between them instead of seeking while it is up.
+                            val overlayButtonsCoexist = uiState.postPlayMode is PostPlayMode.AutoPlay
                             if (!uiState.showControls && !overlayButtonsCoexist) {
                                 val isLeft =
                                     keyEvent.nativeKeyEvent.keyCode == KeyEvent.KEYCODE_DPAD_LEFT
@@ -2317,11 +2318,18 @@ fun PlayerScreen(
                 progressBarFocusRequester = if (uiState.showControls) progressBarFocusRequester else null,
                 leftFocusRequester = if (skipButtonActuallyVisible) skipIntroFocusRequester else null,
                 onPlayNext = { viewModel.onEvent(PlayerEvent.OnPlayNextEpisode) },
+                onCancelNext = { viewModel.onEvent(PlayerEvent.OnDismissNextEpisodeCard) },
                 onContinueStillWatching = { viewModel.onEvent(PlayerEvent.OnStillWatchingContinue) },
                 onDismissStillWatching = { viewModel.onEvent(PlayerEvent.OnDismissStillWatchingPrompt) },
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
-                    .padding(end = 26.dp, bottom = if (uiState.showControls) 122.dp else 30.dp)
+                    // Fork: the V2 up-next card is taller, so it sits higher to clear the progress bar.
+                    .padding(
+                        end = 26.dp,
+                        bottom = if (uiState.showControls) {
+                            if (com.nuvio.tv.ui.v2.appearance.LocalV2Appearance.current != null) 150.dp else 122.dp
+                        } else 30.dp
+                    )
                     .zIndex(2.1f)
                     .reportSubtitleClearance(subtitleClearanceGapPx) { postPlayClearancePx = it },
             )
