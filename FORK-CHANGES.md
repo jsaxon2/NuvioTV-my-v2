@@ -60,6 +60,12 @@ tube. Unit tests are included where the logic is testable; the commit messages e
   groups show labelled buttons, the right group icons. The layout editor's style button cycles through all
   three; saved as style id `hybrid`.
 
+- **Up-next card**: comes up at the set time and counts down to the end of the episode (paused with the
+  video), then plays the next one; **Play now** plays it straight away, **Cancel** lets the episode finish.
+  Thumbnail, episode, title and countdown over the two buttons; a glass panel with V2 buttons in the V2 look.
+  Left/right move between the buttons while it is up.
+- **Next-episode time before the end in 5 second steps** (0 to 3.5 min) instead of half minutes.
+
 ## Settings
 
 - **Settings search finds this build's settings**: Recently Watched (and its window), the clock, the OSD
