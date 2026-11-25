@@ -200,6 +200,22 @@ internal object StreamBadgeRulesParser {
 
 internal object StreamBadgeMatcher {
     private val WHITESPACE_PATTERN = Regex("\\s+")
+
+    /** Fork: skip rules whose required words are missing from a source's text. Off only in tests, to compare. */
+    @Volatile
+    internal var requiredWordsCheck: Boolean = true
+
+    /** Fork: all of a source's text in lowercase, for the required-words check. */
+    private fun lowercaseText(candidates: List<String>): String =
+        candidates.joinToString(" ").lowercase(java.util.Locale.ROOT)
+
+    /** Fork: false when the rule's required words are known and none of them is in [text]. */
+    private fun mayMatch(filter: CompiledStreamBadgeFilter, text: String?): Boolean {
+        if (!requiredWordsCheck || text == null) return true
+        val words = filter.requiredAny ?: return true
+        for (word in words) if (text.contains(word)) return true
+        return false
+    }
     private val lastCompiled = AtomicReference<Pair<StreamBadgeRules, List<CompiledStreamBadgeFilter>>?>(null)
 
     fun compileCached(rules: StreamBadgeRules): List<CompiledStreamBadgeFilter> {
@@ -236,7 +252,8 @@ internal object StreamBadgeMatcher {
                     // If the candidate doesn't contain this literal (case-insensitive),
                     // we skip the expensive regex entirely.
                     literalHint = extractLiteralHint(filter.pattern),
-                    groupId = filter.groupId
+                    groupId = filter.groupId,
+                    requiredAny = BadgeRequiredLiterals.of(filter.pattern)?.toTypedArray()
                 )
             }
         }
@@ -277,10 +294,11 @@ internal object StreamBadgeMatcher {
         if (filters.isEmpty() || candidates.isEmpty()) return emptyList()
 
         val normalized = candidates.map { it.replace(WHITESPACE_PATTERN, " ") }
+        val text = lowercaseText(normalized)
         val matched = linkedMapOf<String, StreamBadge>()
         // Reuse a single Matcher instance per filter across all candidates.
         filters.forEach { filter ->
-            if (matchesAnyCandidateReusable(filter, normalized)) {
+            if (mayMatch(filter, text) && matchesAnyCandidateReusable(filter, normalized)) {
                 val key = filter.badge.dedupeKey()
                 if (key !in matched) matched[key] = filter.badge
             }
@@ -307,14 +325,15 @@ internal object StreamBadgeMatcher {
         if (filters.isEmpty()) return emptyList()
         val playback = playbackCandidate?.replace(WHITESPACE_PATTERN, " ")
         val meta = metaCandidates.map { it.replace(WHITESPACE_PATTERN, " ") }
-        val playbackHits = filters.map { playback != null && matchesCandidateReusable(it, playback) }
+        val text = lowercaseText(listOfNotNull(playback) + meta)
+        val playbackHits = filters.map { playback != null && mayMatch(it, text) && matchesCandidateReusable(it, playback) }
         val coveredGroups = filters.filterIndexed { i, f -> playbackHits[i] && f.groupId.isNotBlank() }
             .mapTo(hashSetOf()) { it.groupId }
         val matched = linkedMapOf<String, StreamBadge>()
         filters.forEachIndexed { i, filter ->
             val hit = playbackHits[i] ||
                 (filter.groupId.isBlank() || filter.groupId !in coveredGroups) &&
-                matchesAnyCandidateReusable(filter, meta)
+                mayMatch(filter, text) && matchesAnyCandidateReusable(filter, meta)
             if (hit) {
                 val key = filter.badge.dedupeKey()
                 if (key !in matched) matched[key] = filter.badge
@@ -347,13 +366,14 @@ internal object StreamBadgeMatcher {
         if (filters.isEmpty()) return emptyList()
         val candidates = badgeMatchCandidates(stream)
         if (candidates.isEmpty()) return emptyList()
+        val text = lowercaseText(candidates)
 
         // Fast path: collect matches without allocating a map when possible.
         var firstMatch: StreamBadge? = null
         var matched: LinkedHashMap<String, StreamBadge>? = null
 
         filters.forEach { filter ->
-            if (matchesAnyCandidateReusable(filter, candidates)) {
+            if (mayMatch(filter, text) && matchesAnyCandidateReusable(filter, candidates)) {
                 val key = filter.badge.dedupeKey()
                 val pooled = pool.getOrPut(key) { filter.badge }
                 when {
@@ -471,7 +491,9 @@ class CompiledStreamBadgeFilter(
     val badge: StreamBadge,
     val pattern: Pattern,
     val literalHint: String?,
-    val groupId: String = ""
+    val groupId: String = "",
+    /** Fork: lowercase words, one of which any text this rule matches contains; null when not known. */
+    val requiredAny: Array<String>? = null
 ) {
     /**
      * Per-thread reusable Matcher. [Matcher.reset] is called before each use
