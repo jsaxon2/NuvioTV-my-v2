@@ -70,6 +70,7 @@ import com.nuvio.tv.ui.screens.player.StreamSidecarSubtitles
 import com.nuvio.tv.ui.util.localizedGenreLabel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.async
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -98,7 +99,11 @@ private const val TAG = "StreamScreenViewModel"
 private const val MAX_NOT_CACHED_FALLBACKS = 3
 private const val DIRECT_AUTOPLAY_HARD_TIMEOUT_MS = 60_000L
 private const val STREAM_FILTER_PAGE_SIZE = 100
-private const val BADGE_PUBLISH_INTERVAL_NS = 300_000_000L
+// Fork: 150 ms (was 300) now that matching is quick, so badges follow the sources more closely.
+private const val BADGE_PUBLISH_INTERVAL_NS = 150_000_000L
+// Fork: sources badged per slice before the list is looked at again, and the cores a slice is split over.
+private const val BADGE_SLICE_SIZE = 24
+private val BADGE_WORKERS = Runtime.getRuntime().availableProcessors().coerceIn(1, 4)
 
 @HiltViewModel
 class StreamScreenViewModel @Inject constructor(
@@ -389,20 +394,40 @@ class StreamScreenViewModel @Inject constructor(
             // Nothing can match without active filters, so skip rebuilding the
             // stream lists for every chunk.
             if (!streamBadgePresentation.hasActiveFilters()) return@launch
+            // Fork: small slices, re-read after each one, so sources that arrive while a big list is being
+            // badged (the next add-on) go ahead of the rest when they are on screen; each slice is split
+            // across the processor cores.
+            val badgeT0 = android.os.SystemClock.elapsedRealtime()
+            var lastPublishNs = 0L
+            var unpublished = false
+            var checked = 0
             while (true) {
-                val pending = _uiState.value.addonStreams
-                    .flatMap { it.streams }
-                    .filter { it.badgeMergeKey() !in badgeCheckedKeys }
-                if (pending.isEmpty()) break
-                var unpublished = false
-                var lastPublishNs = System.nanoTime()
-                for (chunk in pending.chunked(5)) {
-                    ensureActive()
-                    val chunkGroup = AddonStreams(addonName = "", addonLogo = null, streams = chunk)
-                    val badgedChunk = streamBadgePresentation.apply(listOf(chunkGroup))
-                        .firstOrNull()?.streams ?: chunk
-                    badgedChunk.forEachIndexed { index, badged ->
-                        val original = chunk.getOrNull(index) ?: return@forEachIndexed
+                ensureActive()
+                val state = _uiState.value
+                val shownOrder = state.filteredStreams.withIndex()
+                    .associate { (index, stream) -> stream.badgeMergeKey() to index }
+                val slice = state.addonStreams.asSequence()
+                    .flatMap { it.streams.asSequence() }
+                    .map { it to it.badgeMergeKey() }
+                    .filter { (_, key) -> key !in badgeCheckedKeys }
+                    .distinctBy { (_, key) -> key }
+                    .sortedBy { (_, key) -> shownOrder[key] ?: Int.MAX_VALUE }
+                    .take(BADGE_SLICE_SIZE)
+                    .map { (stream, _) -> stream }
+                    .toList()
+                if (slice.isEmpty()) break
+                val parts = slice.chunked(((slice.size + BADGE_WORKERS - 1) / BADGE_WORKERS).coerceAtLeast(1))
+                val results = kotlinx.coroutines.coroutineScope {
+                    parts.map { part ->
+                        async(kotlinx.coroutines.Dispatchers.Default) {
+                            val group = AddonStreams(addonName = "", addonLogo = null, streams = part)
+                            part to (streamBadgePresentation.apply(listOf(group)).firstOrNull()?.streams ?: part)
+                        }
+                    }.map { it.await() }
+                }
+                results.forEach { (part, badgedPart) ->
+                    badgedPart.forEachIndexed { index, badged ->
+                        val original = part.getOrNull(index) ?: return@forEachIndexed
                         val key = original.badgeMergeKey()
                         if (badged !== original) {
                             computedBadges[key] = badged.badges
@@ -410,15 +435,20 @@ class StreamScreenViewModel @Inject constructor(
                         }
                         badgeCheckedKeys.add(key)
                     }
-                    if (unpublished && System.nanoTime() - lastPublishNs >= BADGE_PUBLISH_INTERVAL_NS) {
-                        ensureActive()
-                        publishStreamBadges()
-                        unpublished = false
-                        lastPublishNs = System.nanoTime()
-                    }
                 }
-                ensureActive()
-                if (unpublished) publishStreamBadges()
+                checked += slice.size
+                // The first matched slice goes on screen at once, later ones every interval.
+                if (unpublished && System.nanoTime() - lastPublishNs >= BADGE_PUBLISH_INTERVAL_NS) {
+                    ensureActive()
+                    publishStreamBadges()
+                    unpublished = false
+                    lastPublishNs = System.nanoTime()
+                }
+            }
+            ensureActive()
+            if (unpublished) publishStreamBadges()
+            if (checked > 0) {
+                android.util.Log.i(TAG, "BADGE_PASS sources=$checked ms=${android.os.SystemClock.elapsedRealtime() - badgeT0}")
             }
         }
     }
