@@ -759,10 +759,20 @@ internal fun PlayerRuntimeController.updateActiveSkipInterval(positionMs: Long) 
         }
         val segmentType = AutoSkipSegmentType.fromSkipIntervalType(active.type)
         val activeKey = active.autoSkipKey()
+        // Fork: credits that run to the end of the file, with a next episode to go to, are left to the up-next
+        // card (it counts down to the end, Play now skips them). Skipping them jumped to the end, so the next
+        // episode started the moment the card appeared.
+        val durationMs = currentPlaybackDurationMs()
+        val creditsToEndWithNext = active.type in PlayerNextEpisodeRules.OUTRO_SEGMENT_TYPES &&
+            !targetsPostCredits &&
+            durationMs > 0L &&
+            (active.endTime * 1_000.0).toLong() >= durationMs - PlayerNextEpisodeRules.POST_OUTRO_AUTOPLAY_GAP_MS &&
+            _uiState.value.nextEpisode?.hasAired == true
         if (
             segmentType != null &&
             segmentType in autoSkipSegmentTypes &&
-            activeKey !in autoSkippedIntervalKeys
+            activeKey !in autoSkippedIntervalKeys &&
+            !creditsToEndWithNext
         ) {
             autoSkippedIntervalKeys.add(activeKey)
             skipInterval(active)
