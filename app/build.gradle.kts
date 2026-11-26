@@ -193,11 +193,11 @@ android {
         buildConfigField("String", "PREMIUMIZE_CLIENT_ID", "\"${localProperties.getProperty("PREMIUMIZE_CLIENT_ID", "")}\"")
         buildConfigField("String", "SPONSOR_NAMES", buildConfigString(sponsorNames))
 
-        // Fork: Arc+ checks its own releases (jsaxon2/NuvioTV-my-v2), never ysosrs123's. Each release body
+        // Fork: Arc+ checks its own releases (jsaxon2/Nuvio-Arc-Plus), never ysosrs123's. Each release body
         // carries <!-- nuvio-fork-version-code: N --> with N = Arc's code * 10 + the Arc+ release number.
         buildConfigField("String", "GITHUB_OWNER", "\"jsaxon2\"")
-        buildConfigField("String", "GITHUB_REPO", "\"NuvioTV-my-v2\"")
-        buildConfigField("String", "GITHUB_REPO_NEW_NAME", "\"NuvioTV-my-v2\"")
+        buildConfigField("String", "GITHUB_REPO", "\"Nuvio-Arc-Plus\"")
+        buildConfigField("String", "GITHUB_REPO_NEW_NAME", "\"Nuvio-Arc-Plus\"")
         buildConfigField("boolean", "UPDATE_CHECK_ENABLED", "true")
     }
 

@@ -19,18 +19,18 @@ class ForkUpdateRepositoryTest {
     private val nextCode = BuildConfig.VERSION_CODE + 1L
     private fun asset(abi: String = "arm64-v8a") = GitHubAssetDto(
         "app-full-$abi-release.apk",
-        "https://github.com/jsaxon2/NuvioTV-my-v2/releases/download/test/app-full-$abi-release.apk", 42
+        "https://github.com/jsaxon2/Nuvio-Arc-Plus/releases/download/test/app-full-$abi-release.apk", 42
     )
     private fun release(code: Long = nextCode, assets: List<GitHubAssetDto> = listOf(asset())) = GitHubReleaseDto(
         tagName = BuildConfig.VERSION_NAME, prerelease = true,
         body = "Notes\n<!-- nuvio-fork-version-code: $code -->", assets = assets
     )
     @Test fun `fetches fork prereleases across pages and offers higher build with same tag`() = runTest {
-        coEvery { api.getReleases("jsaxon2", "NuvioTV-my-v2", 100, 1) } returns Response.success(
+        coEvery { api.getReleases("jsaxon2", "Nuvio-Arc-Plus", 100, 1) } returns Response.success(
             listOf(release(BuildConfig.VERSION_CODE.toLong())),
             Headers.headersOf("Link", "<https://api.github.com/next>; rel=\"next\"")
         )
-        coEvery { api.getReleases("jsaxon2", "NuvioTV-my-v2", 100, 2) } returns Response.success(listOf(release()))
+        coEvery { api.getReleases("jsaxon2", "Nuvio-Arc-Plus", 100, 2) } returns Response.success(listOf(release()))
         val update = repo.getLatestUpdate(listOf("arm64-v8a")).getOrThrow()
         assertEquals(nextCode, update.versionCode)
         assertEquals("Notes", update.notes)
@@ -50,17 +50,17 @@ class ForkUpdateRepositoryTest {
         assertEquals(nextCode, repo.getLatestUpdate(listOf("arm64-v8a")).getOrThrow().versionCode)
     }
     @Test fun `accepts release files served under the renamed repository`() = runTest {
-        val renamed = asset().copy(browserDownloadUrl = "https://github.com/jsaxon2/NuvioTV-my-v2/releases/download/test/app-full-arm64-v8a-release.apk")
-        coEvery { api.getReleases("jsaxon2", "NuvioTV-my-v2", any(), any()) } returns Response.success(listOf(release(assets = listOf(renamed))))
+        val renamed = asset().copy(browserDownloadUrl = "https://github.com/jsaxon2/Nuvio-Arc-Plus/releases/download/test/app-full-arm64-v8a-release.apk")
+        coEvery { api.getReleases("jsaxon2", "Nuvio-Arc-Plus", any(), any()) } returns Response.success(listOf(release(assets = listOf(renamed))))
         assertEquals(renamed.browserDownloadUrl, repo.getLatestUpdate(listOf("arm64-v8a")).getOrThrow().assetUrl)
     }
     @Test fun `release files from look-alike addresses are never offered`() = runTest {
         val file = "releases/download/test/app-full-arm64-v8a-release.apk"
         for (url in listOf(
-            "https://github.com/jsaxon2/NuvioTV-my-v2-evil/$file",
+            "https://github.com/jsaxon2/Nuvio-Arc-Plus-evil/$file",
             "https://github.com/jsaxon2/Nuvio-Arc-x/$file",
-            "http://github.com/jsaxon2/NuvioTV-my-v2/$file",
-            "https://github.com.evil.example/jsaxon2/NuvioTV-my-v2/$file",
+            "http://github.com/jsaxon2/Nuvio-Arc-Plus/$file",
+            "https://github.com.evil.example/jsaxon2/Nuvio-Arc-Plus/$file",
             "https://github.com/someone/Nuvio-Arc/$file"
         )) {
             val lookAlike = asset().copy(browserDownloadUrl = url)
