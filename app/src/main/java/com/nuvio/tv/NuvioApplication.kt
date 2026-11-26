@@ -139,6 +139,7 @@ class NuvioApplication : Application(), SingletonImageLoader.Factory {
         com.nuvio.tv.core.util.StartupLatencyTrace.coldOnce("app_create")
         com.nuvio.tv.core.image.PosterUpdates.started(System.currentTimeMillis(), android.os.SystemClock.elapsedRealtime())
         warmStartPreferences()
+        com.nuvio.tv.core.tracking.TrackerDisconnectNotices.init(this)
         com.nuvio.tv.core.network.ArcDns.init(this)
         (getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager).let { am ->
             val info = ActivityManager.MemoryInfo().also(am::getMemoryInfo)

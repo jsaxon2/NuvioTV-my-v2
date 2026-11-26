@@ -4681,4 +4681,10 @@
     <string name="plugin_summary_stopped">%1$d stopped at the time limit</string>
     <string name="plugin_summary_running">%1$d still searching</string>
     <string name="plugin_breakdown_title">Plugin search</string>
+    <string name="tracker_disconnected_title_one">%1$s was disconnected</string>
+    <string name="tracker_disconnected_title_many">Trackers were disconnected</string>
+    <string name="tracker_disconnected_subtitle">The service stopped accepting this TV\'s sign-in, so watch progress isn\'t syncing with it. Reconnect, or leave it off.</string>
+    <string name="tracker_disconnected_line">%1$s: %2$s at %3$s</string>
+    <string name="tracker_disconnected_reconnect">Reconnect</string>
+    <string name="tracker_disconnected_leave_off">Leave off</string>
 </resources>

@@ -101,7 +101,9 @@ fun HomeScreen(
     onContinueWatchingStartFromBeginning: (ContinueWatchingItem) -> Unit = onContinueWatchingClick,
     onContinueWatchingPlayManually: (ContinueWatchingItem) -> Unit = onContinueWatchingClick,
     onNavigateToCatalogSeeAll: (String, String, String) -> Unit = { _, _, _ -> },
-    onNavigateToFolderDetail: (String, String) -> Unit = { _, _ -> }
+    onNavigateToFolderDetail: (String, String) -> Unit = { _, _ -> },
+    /** Fork: opens the tracker settings from the tracker-disconnected dialog. */
+    onNavigateToTrackers: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
@@ -507,6 +509,9 @@ fun HomeScreen(
                 LoadingIndicator()
             }
         }
+
+        // Fork: trackers signed out by their services, to reconnect or leave off.
+        TrackerDisconnectedDialogHost(onReconnect = onNavigateToTrackers)
 
         val startupAuthNotice = uiState.startupAuthNotice
         if (startupAuthNotice != null) {

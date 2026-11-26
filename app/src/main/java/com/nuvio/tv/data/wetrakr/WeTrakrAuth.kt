@@ -363,6 +363,10 @@ class WeTrakrAuthRepository(
             if (response.status !in 200..299) {
                 if (response.status in setOf(400, 401)) {
                     store.clearAuth(scope, WeTrakrAuthError.AUTHORIZATION_REVOKED, current.tokens.accessToken)
+                    // Fork: tell the viewer, so they can reconnect.
+                    com.nuvio.tv.core.tracking.TrackerDisconnectNotices.report(
+                        "WeTrakr", "HTTP ${response.status} ${response.errorCode()} on token refresh"
+                    )
                     throw WeTrakrAuthException(WeTrakrAuthError.AUTHORIZATION_REVOKED)
                 }
                 throw WeTrakrApiException(response.status, response.errorCode())

@@ -132,6 +132,10 @@ class MdbListAuthRepository(
                 if (response.errorCode() in setOf("invalid_grant", "invalid_token")) {
                     val cleared =
                         store.clearAuth(scope, MdbListAuthError.AUTHORIZATION_REVOKED, current.tokens.accessToken)
+                    // Fork: tell the viewer, so they can reconnect.
+                    if (cleared) com.nuvio.tv.core.tracking.TrackerDisconnectNotices.report(
+                        "MDBList", "HTTP ${response.status} ${response.errorCode()} on token refresh"
+                    )
                     Log.w(
                         TAG,
                         "refresh failed status=${response.status} code=${response.errorCode()} " +

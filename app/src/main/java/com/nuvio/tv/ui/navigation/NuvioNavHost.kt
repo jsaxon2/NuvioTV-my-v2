@@ -272,6 +272,7 @@ private fun PlaybackNavHost(
             }
 
             HomeScreen(
+                onNavigateToTrackers = { navController.navigate(Screen.Tracking.route) },
                 onNavigateToDetail = { itemId, itemType, addonBaseUrl ->
                     com.nuvio.tv.core.performance.DetailEntryTrace.begin()
                     val heroArtwork = HeroBackdropState.consumeArtworkForTitle(itemId, itemType)

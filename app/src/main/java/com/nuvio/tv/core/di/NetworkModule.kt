@@ -315,6 +315,8 @@ object NetworkModule {
         configuration = configuration,
         authorization = storage::authorization,
         onUnauthorized = { authorization ->
+            // Fork: tell the viewer, so they can reconnect.
+            com.nuvio.tv.core.tracking.TrackerDisconnectNotices.report("Simkl", "HTTP 401 on a request")
             storage.clearAuth(
                 error = SimklAuthError.AUTHORIZATION_REVOKED,
                 scope = authorization.scope,

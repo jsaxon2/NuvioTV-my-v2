@@ -572,6 +572,8 @@ class TraktAuthService @Inject constructor(
     }
 
     private suspend fun invalidateCredentials(statusCode: Int) {
+        // Fork: tell the viewer, so they can reconnect.
+        com.nuvio.tv.core.tracking.TrackerDisconnectNotices.report("Trakt", "HTTP $statusCode on token refresh")
         authSessionNoticeDataStore.markTraktReconnectRequired()
         traktAuthDataStore.clearAuth()
         tripCircuit("Token refresh returned $statusCode")
