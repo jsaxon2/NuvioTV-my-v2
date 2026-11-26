@@ -60,6 +60,7 @@ class NuvioApplication : Application(), SingletonImageLoader.Factory {
     @Inject lateinit var reportStatusChecker: com.nuvio.tv.data.repository.ReportStatusChecker
     @Inject lateinit var screensaverController: com.nuvio.tv.core.player.ScreensaverController
     @Inject lateinit var streamBadgePresentation: com.nuvio.tv.core.streams.StreamBadgePresentation
+    @Inject lateinit var profileManager: com.nuvio.tv.core.profile.ProfileManager
 
     companion object {
         private const val CACHE_TAG = "NuvioCache"
@@ -139,7 +140,6 @@ class NuvioApplication : Application(), SingletonImageLoader.Factory {
         com.nuvio.tv.core.util.StartupLatencyTrace.coldOnce("app_create")
         com.nuvio.tv.core.image.PosterUpdates.started(System.currentTimeMillis(), android.os.SystemClock.elapsedRealtime())
         warmStartPreferences()
-        com.nuvio.tv.core.tracking.TrackerDisconnectNotices.init(this)
         com.nuvio.tv.core.network.ArcDns.init(this)
         (getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager).let { am ->
             val info = ActivityManager.MemoryInfo().also(am::getMemoryInfo)
@@ -147,6 +147,7 @@ class NuvioApplication : Application(), SingletonImageLoader.Factory {
         }
         super.onCreate()
         com.nuvio.tv.core.util.StartupLatencyTrace.coldOnce("app_injected")
+        com.nuvio.tv.core.tracking.TrackerDisconnectNotices.init(this, profileManager.activeProfileId)
         com.nuvio.tv.data.repository.ArcCrashFile.install(this) { screensaverController.playbackActive.value }
         com.nuvio.tv.data.repository.ArcBuildLog.start(this)
         com.nuvio.tv.data.repository.ArcMainWatchdog.start(this)

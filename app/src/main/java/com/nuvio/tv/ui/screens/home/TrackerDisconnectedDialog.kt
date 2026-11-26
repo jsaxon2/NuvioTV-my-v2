@@ -33,7 +33,9 @@ import com.nuvio.tv.ui.theme.NuvioTheme
  */
 @Composable
 internal fun TrackerDisconnectedDialogHost(onReconnect: () -> Unit) {
-    val notices by TrackerDisconnectNotices.pending.collectAsState()
+    val allNotices by TrackerDisconnectNotices.pending.collectAsState()
+    val profileId by TrackerDisconnectNotices.activeProfile.collectAsState()
+    val notices = TrackerDisconnectNotices.forProfile(allNotices, profileId)
     // Wait for the start animation to finish, then a moment more, so the alert doesn't cover it.
     val entry = com.nuvio.tv.ui.v2.profile.LocalProfileEntryState.current
     val introPlaying = entry?.pending == true
@@ -61,7 +63,7 @@ internal fun TrackerDisconnectedDialogHost(onReconnect: () -> Unit) {
     val dateFormat = android.text.format.DateFormat.getMediumDateFormat(context)
 
     NuvioDialog(
-        onDismiss = { TrackerDisconnectNotices.dismissAll() },
+        onDismiss = { TrackerDisconnectNotices.dismissFor(profileId) },
         title = title,
         subtitle = stringResource(R.string.tracker_disconnected_subtitle),
         suppressFirstKeyUp = false
@@ -85,7 +87,7 @@ internal fun TrackerDisconnectedDialogHost(onReconnect: () -> Unit) {
             horizontalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.md)
         ) {
             Button(
-                onClick = { TrackerDisconnectNotices.dismissAll() },
+                onClick = { TrackerDisconnectNotices.dismissFor(profileId) },
                 modifier = Modifier.weight(1f),
                 colors = ButtonDefaults.colors(
                     containerColor = NuvioTheme.colors.BackgroundCard,
@@ -96,7 +98,7 @@ internal fun TrackerDisconnectedDialogHost(onReconnect: () -> Unit) {
             }
             Button(
                 onClick = {
-                    TrackerDisconnectNotices.dismissAll()
+                    TrackerDisconnectNotices.dismissFor(profileId)
                     onReconnect()
                 },
                 modifier = Modifier

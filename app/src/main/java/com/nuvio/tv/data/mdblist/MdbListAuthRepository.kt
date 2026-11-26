@@ -134,7 +134,7 @@ class MdbListAuthRepository(
                         store.clearAuth(scope, MdbListAuthError.AUTHORIZATION_REVOKED, current.tokens.accessToken)
                     // Fork: tell the viewer, so they can reconnect.
                     if (cleared) com.nuvio.tv.core.tracking.TrackerDisconnectNotices.report(
-                        "MDBList", "HTTP ${response.status} ${response.errorCode()} on token refresh"
+                        "MDBList", "HTTP ${response.status} ${response.errorCode()} on token refresh", scope.profileId
                     )
                     Log.w(
                         TAG,

@@ -365,7 +365,7 @@ class WeTrakrAuthRepository(
                     store.clearAuth(scope, WeTrakrAuthError.AUTHORIZATION_REVOKED, current.tokens.accessToken)
                     // Fork: tell the viewer, so they can reconnect.
                     com.nuvio.tv.core.tracking.TrackerDisconnectNotices.report(
-                        "WeTrakr", "HTTP ${response.status} ${response.errorCode()} on token refresh"
+                        "WeTrakr", "HTTP ${response.status} ${response.errorCode()} on token refresh", scope.profileId
                     )
                     throw WeTrakrAuthException(WeTrakrAuthError.AUTHORIZATION_REVOKED)
                 }
