@@ -96,6 +96,8 @@ tube. Unit tests are included where the logic is testable; the commit messages e
 - **Badge matching about 10 times faster for big packs**: each badge rule knows the words it can't match
   without and is skipped for sources that lack them. Same badges; the 241-rule Neon pack went from 44 s to
   under 4 s over 3,800 sources.
+- **Badges follow the sources on screen**: worked out in small slices across the processor cores, sources
+  on screen first, so the next add-on's sources no longer wait for the previous add-on's whole list.
 - **File size badge for Torrentio** and other add-ons that put the size in the text ("💾 6.91 GB").
 
 ## Fixed here first, since taken over by Arc
