@@ -78,6 +78,10 @@ tube. Unit tests are included where the logic is testable; the commit messages e
   free-tier key under its 1,000 requests a day across three TVs. Failed requests (a hit limit) are never
   cached.
 
+- **Tracker disconnected alert**: when Trakt, Simkl, MDBList or WeTrakr is signed out by its service (not
+  by you), Home shows one dialog after the start animation, with when it happened, **Reconnect** (opens the
+  tracker settings) and **Leave off**. Either answer clears it until a new sign-out.
+
 ## Performance (`try-perf`)
 
 - **Display-size artwork copies**: card art from non-TMDB sources, and TMDB `original` backdrops, are
