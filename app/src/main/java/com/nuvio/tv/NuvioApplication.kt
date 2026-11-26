@@ -59,6 +59,7 @@ class NuvioApplication : Application(), SingletonImageLoader.Factory {
     @Inject lateinit var reportOutbox: com.nuvio.tv.data.repository.ReportOutbox
     @Inject lateinit var reportStatusChecker: com.nuvio.tv.data.repository.ReportStatusChecker
     @Inject lateinit var screensaverController: com.nuvio.tv.core.player.ScreensaverController
+    @Inject lateinit var streamBadgePresentation: com.nuvio.tv.core.streams.StreamBadgePresentation
 
     companion object {
         private const val CACHE_TAG = "NuvioCache"
@@ -73,6 +74,7 @@ class NuvioApplication : Application(), SingletonImageLoader.Factory {
 
         /** Long enough that the walk cannot contend with cold start. */
         private const val CACHE_READOUT_DELAY_MS = 15_000L
+        private const val BADGE_RULES_WARM_DELAY_MS = 4_000L
 
         /**
          * Shared cookie jar for CloudStream extension HTTP requests.
@@ -161,6 +163,13 @@ class NuvioApplication : Application(), SingletonImageLoader.Factory {
         val tag = getSharedPreferences("app_locale", Context.MODE_PRIVATE)
             .getString("locale_tag", null)
         LocaleCache.localeTag = tag ?: ""
+
+        // Fork: get the badge pack's rules ready (compiled, required words worked out) a few seconds after
+        // start, off the start path, so the first sources list doesn't wait seconds for it on a weak box.
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default).launch {
+            delay(BADGE_RULES_WARM_DELAY_MS)
+            runCatching { streamBadgePresentation.hasActiveFilters() }
+        }
 
         // Logs how much OkHttp's 50 MB http_cache holds and Coil's COMPUTED
         // disk cap (a percent-based cap is otherwise invisible). Deliberately
